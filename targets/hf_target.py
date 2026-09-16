@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""HfTarget（backend: hf，Mistral-7B-Instruct-v0.3，V0.3 设计 §3）。
+"""HfTarget（backend: hf，V100: Mistral-7B FP16 / RTX4060: Phi-3.5-mini 4-bit NF4）。
 
 - chat template 生成；默认贪心（do_sample=false）、max_new_tokens=512；
-- 通过 ModelManager 分时加载（"target" 角色）；
-- retry 记入 response.metadata（不增加 query 计数的重试由上层保证语义）。
+- 8GB 档 Target 走 4-bit NF4（quantization/compute_dtype 记入响应与 provenance，
+  所有条件使用同一量化实例，不破坏研究设计）；
+- 通过 ModelManager 分时加载（"target" 角色）。
 """
 from typing import Optional
 
@@ -24,6 +25,7 @@ class HfTarget(BaseTarget):
         max_new_tokens: int = 512,
         temperature: float = 1.0,
         top_p: float = 1.0,
+        quantization: Optional[dict] = None,   # quantization_spec() 的返回值
     ) -> None:
         self.model_path = model_path
         self.manager = model_manager
@@ -33,6 +35,7 @@ class HfTarget(BaseTarget):
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.top_p = top_p
+        self.quantization = quantization
         self._model = None
         self._tokenizer = None
         self.calls = 0
@@ -46,7 +49,8 @@ class HfTarget(BaseTarget):
         def _load():
             from engine.hf_backend import load_causal_lm
             self._model, self._tokenizer = load_causal_lm(
-                self.model_path, dtype=self.dtype, device=self.device)
+                self.model_path, dtype=self.dtype, device=self.device,
+                quantization=self.quantization)
 
         if self.manager is not None:
             self.manager.acquire("target", _load)
@@ -81,5 +85,11 @@ class HfTarget(BaseTarget):
             latency=time.time() - start,
             input_tokens=result["input_tokens"],
             output_tokens=result["output_tokens"],
-            metadata={"backend": self.name, "model_path": self.model_path},
+            metadata={
+                "backend": self.name,
+                "model_path": self.model_path,
+                "quantization": (self.quantization or {}).get("mode"),
+                "compute_dtype": (self.quantization or {}).get(
+                    "compute_dtype", self.dtype),
+            },
         )

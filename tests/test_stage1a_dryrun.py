@@ -11,7 +11,7 @@ from engine.factory import RunnerBundle
 from experiments.stage1a import Stage1AExperiment, _dry_run_config
 from utils.io import load_yaml
 
-CFG_PATH = "configs/stage1a.yaml"
+CFG_PATH = "configs/hardware/rtx4060_8g.yaml"
 
 
 class TestStage1ADryRun(unittest.TestCase):

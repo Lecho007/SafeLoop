@@ -1,86 +1,121 @@
 # SafeLoop 命令文档 环境配置指南
 
-## 环境配置指南
-```bash
-# 创建虚拟环境
-mamba create -n safeLoop python=3.8 -y
+## 环境配置（2026-09-16 已重建为 Python 3.10 并实测可用）
 
-# 激活环境
+> ⚠️ 版本变更说明：原计划的 Python 3.8 无法运行 Qwen3——Qwen3 架构需要
+> transformers ≥ 4.51，而 transformers 从 4.49 起放弃 Python 3.8（实测 4.46.3 报
+> "model type qwen3 not recognized"）。环境已重建为 Python 3.10，以下为实测可用组合：
+
+```bash
+mamba create -n safeLoop python=3.10 -y
 mamba activate safeLoop
 
-# 安装基础依赖
-pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 -i https://download.pytorch.org/whl/cu121 -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
-
-mamba install pip numpy pandas opencv -c conda-forge -y
+# 实测锁定版本（RTX 4060 Laptop / WSL2 / CUDA 可用）
+pip install torch==2.1.0 transformers==4.53.2 peft==0.15.2 accelerate==1.7.0 bitsandbytes==0.45.5 pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install "numpy<2"    # 必需：torch 2.1 按 numpy 1.x 编译，numpy 2.x 会报 _ARRAY_API 错误
 ```
 
-## 模型权重下载（V100 32GB，FP16 分时加载）
+环境路径：`/home/MMCP/miniforge3/envs/safeLoop`（下文以 `$PY` 代指
+`/home/MMCP/miniforge3/envs/safeLoop/bin/python`，或先 `mamba activate safeLoop`）。
 
-四个模型权重分别放入以下目录（目录已建好，直接下载到对应位置）：
+> CUDA 兼容提示：驱动显示的 CUDA 版本（如 13.x）高于 PyTorch 自带 runtime（cu121）无需处理，
+> 只要 `torch.cuda.is_available() == True` 且基础 tensor 测试正常就继续用。
 
-| 角色 | 模型 | 存放目录 |
-|------|------|----------|
-| Red Agent | `Qwen/Qwen3-4B` | `weights/red/Qwen3-4B/` |
-| Target | `mistralai/Mistral-7B-Instruct-v0.3` | `weights/target/Mistral-7B-Instruct-v0.3/` |
-| Judge | `Qwen/Qwen3Guard-Gen-4B` | `weights/judge/Qwen3Guard-Gen-4B/` |
-| Evaluator | StrongREJECT 微调 Gemma-2B | `weights/evaluator/strongreject-gemma-2b/` |
+## 双硬件配置档（configs/hardware/，不混用）
 
-下载命令（在 SafeLoop 主目录下执行；服务器能连 HF 就用方案 A，否则方案 B）：
+| 档位 | 配置文件 | 组合 |
+|------|----------|------|
+| **RTX 4060 Laptop 8GB（主开发）** | `configs/hardware/rtx4060_8g.yaml` | Qwen3-1.7B(bf16) → Phi-3.5-mini(**NF4**) → Qwen3Guard-0.6B(bf16) + StrongREJECT-2B(bf16 离线) |
+| V100 32GB（服务器） | `configs/hardware/v100_32g.yaml` | Qwen3-4B → Mistral-7B → Qwen3Guard-4B + StrongREJECT-2B（全 FP16） |
+
+量化策略：只量化 Target（NF4，compute bf16）；Red/Judge 不量化；E 离线 bf16。
+4060 档 BF16 实测不兼容时，把 red/judge 的 dtype 统一降 float16。
+
+## 模型权重（RTX 4060 档已全部下载就位，共约 17.6G，check_weights PASS）
+
+| 角色 | 模型 | 目录 | 大小 |
+|------|------|------|------|
+| Red Agent | `Qwen/Qwen3-1.7B` | `weights/red/Qwen3-1.7B/` | 3.8G |
+| Target | `microsoft/Phi-3.5-mini-instruct` | `weights/target/Phi-3.5-mini-instruct/` | 7.2G |
+| Judge | `Qwen/Qwen3Guard-Gen-0.6B` | `weights/judge/Qwen3Guard-Gen-0.6B/` | 1.5G |
+| Evaluator(LoRA) | `qylu4156/strongreject-15k-v1` | `weights/evaluator/strongreject-gemma-2b/` | 59M |
+| Evaluator 底座 | `google/gemma-2b`（gated，已下载） | `weights/evaluator/gemma-2b-base/` | 5G |
+
+StrongREJECT 官方实现 = gemma-2b 底座 + PEFT LoRA；打分逻辑已按官方源码移植到
+`evaluation/strongreject_evaluator.py`，模板版本化于 `prompts/evaluator/strongreject_v1.yaml`。
+如需在其他机器重下 gated 底座：
+```bash
+# 先在 HF 接受 google/gemma-2b 协议，然后：
+HF_TOKEN=hf_xxx hf download google/gemma-2b --local-dir weights/evaluator/gemma-2b-base
+```
+
+**V100 档（服务器，按需再下）**：
+`weights/red/Qwen3-4B/`、`weights/target/Mistral-7B-Instruct-v0.3/`、`weights/judge/Qwen3Guard-Gen-4B/`
+（Evaluator 的 LoRA 与 gemma-2b 底座两档共用）。命令同下。
+
+**通用下载命令**（注意：新版 huggingface_hub 的 CLI 是 `hf`，`huggingface-cli` 已弃用）：
 
 ```bash
-# 方案 A：huggingface-cli（pip install -U "huggingface_hub[cli]"）
-huggingface-cli download Qwen/Qwen3-4B --local-dir weights/red/Qwen3-4B
-huggingface-cli download mistralai/Mistral-7B-Instruct-v0.3 --local-dir weights/target/Mistral-7B-Instruct-v0.3
-huggingface-cli download Qwen/Qwen3Guard-Gen-4B --local-dir weights/judge/Qwen3Guard-Gen-4B
-
-# StrongREJECT：官方 pip 包 strong-reject 的权重（gemma-2b 微调），
-# 按官方仓库说明导出到本地：
-pip install strong-reject
-# 若官方包只提供在线加载，则把其权重缓存目录内容复制到：
-#   weights/evaluator/strongreject-gemma-2b/
-# （代码优先用官方包；无包时回退 AutoModelForSequenceClassification 读该目录）
-
-# 方案 B：镜像（HF-Mirror）
-HF_ENDPOINT=https://hf-mirror.com huggingface-cli download Qwen/Qwen3-4B --local-dir weights/red/Qwen3-4B
-# 其余三个同理
-
-# 下载完成后校验（应输出 weight check: PASS）
-python scripts/check_weights.py
+hf download Qwen/Qwen3-1.7B --local-dir weights/red/Qwen3-1.7B
+hf download microsoft/Phi-3.5-mini-instruct --local-dir weights/target/Phi-3.5-mini-instruct
+hf download Qwen/Qwen3Guard-Gen-0.6B --local-dir weights/judge/Qwen3Guard-Gen-0.6B
+hf download qylu4156/strongreject-15k-v1 --local-dir weights/evaluator/strongreject-gemma-2b
+# 镜像：HF_ENDPOINT=https://hf-mirror.com hf download ...
+python scripts/check_weights.py    # 完成后校验
 ```
 
 ## SafeLoop-core 框架层依赖
 
 ```bash
-pip install -r requirements.txt        # 目前仅 pyyaml（框架/dry-run/分析）
+pip install -r requirements.txt        # 仅 pyyaml（框架/dry-run/分析，系统 python 即可）
 ```
 
-真实运行（Stage 1A）额外需要（Python 3.8 兼容版本，逐项确认后再装）：
+GPU 真实运行的全部依赖已包含在上面的锁定版本里（transformers/peft/bitsandbytes/accelerate）。
+环境拆分建议：`safeLoop-core`（框架/分析）/ `safeLoop`（真实运行，py3.10）/ `safeLoop-train`（后期训练）。
+
+## 数据集（已下载并生成 manifest）
+
+```text
+data/raw/jbb_harmful_behaviors.csv    # JBB 官方 100 条 misuse behaviors（HF JBB-Behaviors）
+data/raw/jbb_benign_behaviors.csv     # 100 条 benign（留作 OverRefusal/Judge sanity，不进主实验）
+data/raw/jbb_judge_comparison.csv     # 3677 条 judge 对比数据（3 人工 + 4 自动 judge，用于 J 校准）
+data/tasks/jbb20.jsonl                # Stage 1A：10 类 × 2 分层抽样（已生成）
+data/tasks/jbb100.jsonl               # Stage 1B：全量 100 条（已生成）
+data/tasks/jbb20_demo.jsonl           # 占位任务（无数据集时的管道 smoke）
+```
+
+重新生成命令：
 ```bash
-pip install "transformers>=4.45,<4.57" accelerate    # Qwen3 支持需较新版本
-pip install strong-reject                            # StrongREJECT 官方包（可选）
+python scripts/build_jbb_tasks.py --per-category 2 --out data/tasks/jbb20.jsonl
+python scripts/build_jbb_tasks.py --all --out data/tasks/jbb100.jsonl
 ```
-
-环境拆分建议：`safeLoop-core`（框架/分析）/ `safeLoop-train`（真实运行+训练）/ `safeLoop-eval`。
+HarmBench-Val/Test、XSTest-Response 与中文（JailBench/CSEI-SafetyBench）按路线在
+Stage 1C / Judge 校准 / Track-ZH 阶段再下载。
 
 ## 常用命令（均在 SafeLoop 主目录下执行）
 
 ```bash
-# 单元测试（35 项：schemas/protocol/stage1/parsers/stats/CTTS-FRR-ESSR/dry-run）
+# 环境变量（二选一）：
+export PY=/home/MMCP/miniforge3/envs/safeLoop/bin/python   # 或 mamba activate safeLoop
+
+# 单元测试（43 项；框架层用系统 python 即可）
 python -m unittest discover -s tests -v
 
 # Stage 1A dry-run（无权重无 GPU，scripted 后端走同一 round-batched 管道）
-python scripts/run_stage1a.py --dry-run
+$PY scripts/run_stage1a.py --dry-run   # 默认 configs/hardware/rtx4060_8g.yaml
 
-# Stage 1A 真实运行（需权重 + GPU；20 tasks × C1/C3 × B=3 = 120 Target queries）
-python scripts/run_stage1a.py --config configs/stage1a.yaml
+# 小规模真实 smoke（2 tasks × C1/C3 × B=3，约 12 分钟，用于运行前自检）
+$PY scripts/run_stage1a.py --config configs/hardware/rtx4060_smoke2.yaml
 
-# 生成 JBB 任务 manifest
-python scripts/build_jbb_tasks.py --demo --out data/tasks/jbb20_demo.jsonl   # 占位
-python scripts/build_jbb_tasks.py --source /path/to/jailbreakbench.json \
-    --per-category 2 --out data/tasks/jbb20.jsonl                            # 真实 JBB
+# Stage 1A 完整真实运行（JBB-20 × C1/C3 × B=3 = 120 Target queries，约 2 小时）
+nohup $PY scripts/run_stage1a.py --config configs/hardware/rtx4060_8g.yaml \
+    > outputs/logs/stage1a_4060.log 2>&1 &
+tail -f outputs/logs/stage1a_4060.log            # 监控进度（round= 行）
+grep -c "round=" outputs/logs/stage1a_4060.log   # 已完成轮数（满 120 结束）
+pkill -f run_stage1a.py                          # 需要中断时
 
-# 权重完整性校验
-python scripts/check_weights.py
+# 权重完整性校验（含 gemma-2b gated 底座检查）
+python scripts/check_weights.py configs/hardware/rtx4060_8g.yaml
 
 # V0.2 四条件 demo 实验 / 单 episode / replay（保持可用）
 python scripts/run_experiment.py [configs/stage1.yaml]
@@ -88,8 +123,26 @@ python scripts/run_episode.py [configs/stage1.yaml] [C0|C1|C2|C3] [task_index]
 python scripts/replay_trajectory.py outputs/trajectories/<file>.jsonl --level structured
 
 # Judge 校准集（1A 完成后）
-python scripts/build_calibration_set.py outputs/evaluations/stage1a_smoke_C3.jsonl \
+python scripts/build_calibration_set.py outputs/evaluations/stage1a_smoke_4060_C3.jsonl \
     --size 100 --out data/calibration/d_cal.jsonl
+```
+
+## 真实运行调通记录（2026-09-16，2-task smoke 已全链路验收）
+
+smoke 结果：协议校验 PASS、第 0 轮 prompt 跨条件一致、四模型分时加载正常、
+token/查询记账完整、StrongREJECT 离线评估正常、Target Gate=**SUITABLE**
+（Phi-3.5 有部分抵抗力，无 ceiling/floor）；机制信号正确（C1 SSR=0，C3 SSR=1.0）。
+调通过程中修复的问题（代码已固化，重跑无需处理）：
+
+```text
+1. Qwen3/Qwen3Guard chat template 默认开 thinking → chat_generate 传 enable_thinking=False
+   （模板不支持该参数的模型自动回退）；
+2. Qwen3-1.7B 偶发输出畸形 JSON（如 "prompt"> …，冒号误写、未闭合）→
+   parse_red_json 三级解析：扁平对象扫描 → 字段正则 → 宽容提取，失败记 WARNING 并重试；
+3. StrongREJECT LoRA 加载改为本地 PeftModel.from_pretrained + merge_and_unload
+   （原 AutoPeftModel 会试图从 Hub 拉 gemma 底座）；
+4. 期望分权重的 tensor device 与 logits 对齐；
+5. red 模板中字面 JSON 花括号转义（{{ }}），避免被 .format() 当占位符。
 ```
 
 ## 产物位置
@@ -102,16 +155,15 @@ outputs/reports/*.json         # 实验报告（协议校验/指标/配对检验
 data/tasks/jbb20*.jsonl        # JBB 任务 manifest
 ```
 
-## 真实后端切换（configs/stage1a.yaml，只改配置不改源码）
+## 真实后端（configs/hardware/*.yaml，只改配置不改源码）
 
 ```yaml
 red_agent:
-  backend: hf            # weights/red/Qwen3-4B
+  backend: hf            # 4060: weights/red/Qwen3-1.7B | v100: weights/red/Qwen3-4B
 target:
-  backend: hf            # weights/target/Mistral-7B-Instruct-v0.3
+  backend: hf            # 4060: Phi-3.5-mini（quantization: nf4）| v100: Mistral-7B
 judge:
-  backend: qwen3guard    # weights/judge/Qwen3Guard-Gen-4B
+  backend: qwen3guard    # 4060: Qwen3Guard-Gen-0.6B | v100: Qwen3Guard-Gen-4B
 evaluator:
-  backend: strongreject_ft  # weights/evaluator/strongreject-gemma-2b
-# 统一 dtype: float16（V100 不用 BF16）；Target 贪心 do_sample=false
+  backend: strongreject_ft  # LoRA + base_model_path（gemma-2b 底座）
 ```

@@ -1,4 +1,17 @@
+# 模型权重（体积大，不入库）
 weights/
+
+# 数据集：原始下载与真实数据衍生的 manifest（含真实 harmful behaviors，不入库）
+data/raw/
+data/tasks/jbb20.jsonl
+data/tasks/jbb100.jsonl
+data/tasks/jbb20_smoke2.jsonl
+
+# 运行产物与校准集
 outputs/
+data/calibration/
+*.log
+
+# Python
 __pycache__/
 *.pyc

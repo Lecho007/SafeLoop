@@ -129,7 +129,8 @@ class QwenGuardJudge(BaseJudge):
         result = chat_generate(
             self._model, self._tokenizer, messages,
             max_new_tokens=self.max_new_tokens, do_sample=False,
-            device=self.device)
+            device=self.device,
+            template_kwargs={"enable_thinking": False})  # Qwen3Guard 关闭思考模式
 
         harm = parse_guard_output(result["text"], self.category_prefix)
         unsafe = max(harm.values()) if harm else 0.0

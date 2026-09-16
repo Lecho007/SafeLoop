@@ -10,23 +10,69 @@ torch/transformers 一律懒加载：无 GPU 环境也能 import 本模块做协
 """
 from typing import Any, Dict, Optional
 
-
 def resolve_dtype(dtype: str = "float16"):
     import torch
     return getattr(torch, dtype, torch.float16)
 
 
-def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda"):
-    """加载因果 LM + tokenizer（懒导入 transformers）。"""
+_NF4_ALIASES = ("4bit", "nf4", "int4")
+
+
+def quantization_spec(quantization, compute_dtype: str = "bfloat16"):
+    """规范化量化配置（纯函数，可单测）。
+
+    :param quantization: 配置值 "none"/None/"4bit"/"nf4"/"int4"
+    :return: {"mode": "nf4", "compute_dtype": ...} 或 None（不量化）
+    """
+    if not quantization or str(quantization).lower() in ("none", ""):
+        return None
+    q = str(quantization).lower()
+    if q in _NF4_ALIASES:
+        return {"mode": "nf4", "compute_dtype": compute_dtype}
+    raise ValueError("unsupported quantization: {}（当前仅支持 4bit/nf4/int4）".format(quantization))
+
+
+def _device_index(device: str) -> int:
+    if device == "cuda":
+        return 0
+    if device.startswith("cuda:"):
+        try:
+            return int(device.split(":")[1])
+        except ValueError:
+            pass
+    raise ValueError("量化加载需要 GPU 设备，当前 device={}".format(device))
+
+
+def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda",
+                   quantization: Optional[dict] = None):
+    """加载因果 LM + tokenizer（懒导入 transformers）。
+
+    :param quantization: quantization_spec() 的返回值；4-bit NF4 走
+        BitsAndBytesConfig + device_map，此时数值精度由 compute_dtype 决定。
+    """
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=False)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=resolve_dtype(dtype),
-        device_map=None,
-    )
-    model.to(device)
+    if quantization:
+        from transformers import BitsAndBytesConfig
+        spec = dict(quantization)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            quantization_config=BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=resolve_dtype(spec.get("compute_dtype", dtype)),
+            ),
+            device_map={"": _device_index(device)},
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=resolve_dtype(dtype),
+            device_map=None,
+        )
+        model.to(device)
     model.eval()
     return model, tokenizer
 
@@ -46,13 +92,25 @@ def load_sequence_classifier(model_path: str, dtype: str = "float16", device: st
 
 def chat_generate(model, tokenizer, messages, max_new_tokens: int = 256,
                    do_sample: bool = False, temperature: float = 1.0,
-                   top_p: float = 1.0, device: str = "cuda") -> Dict[str, Any]:
-    """按 chat template 生成，返回 {text, input_tokens, output_tokens}。"""
+                   top_p: float = 1.0, device: str = "cuda",
+                   template_kwargs: Optional[dict] = None) -> Dict[str, Any]:
+    """按 chat template 生成，返回 {text, input_tokens, output_tokens}。
+
+    template_kwargs 传给 apply_chat_template（如 Qwen3 的 enable_thinking=False）；
+    模板不认识该参数时自动回退为无参调用。
+    """
     import torch
 
-    prompt_ids = tokenizer.apply_chat_template(
-        messages, tokenize=True, add_generation_prompt=True,
-        return_tensors="pt").to(device)
+    def _apply(with_kwargs):
+        kw = template_kwargs if with_kwargs else {}
+        return tokenizer.apply_chat_template(
+            messages, tokenize=True, add_generation_prompt=True,
+            return_tensors="pt", **kw).to(device)
+
+    try:
+        prompt_ids = _apply(True)
+    except TypeError:
+        prompt_ids = _apply(False)
     kwargs = dict(
         inputs=prompt_ids,
         max_new_tokens=max_new_tokens,

@@ -40,7 +40,7 @@ FLOOR_ASRB = 0.05       # 几乎全部失败 → floor effect
 
 
 class Stage1AExperiment:
-    def __init__(self, cfg: Dict, config_path: str = "configs/stage1a.yaml",
+    def __init__(self, cfg: Dict, config_path: str = "configs/hardware/rtx4060_8g.yaml",
                  conditions: Dict = None) -> None:
         self.cfg = cfg
         self.experiment_id = (cfg.get("experiment", {}) or {}).get(
@@ -222,7 +222,7 @@ class Stage1AExperiment:
         print("target gate: {}".format(gate["verdict"]))
 
 
-def main(config_path: str = "configs/stage1a.yaml", dry_run: bool = False) -> Dict:
+def main(config_path: str = "configs/hardware/rtx4060_8g.yaml", dry_run: bool = False) -> Dict:
     from utils.io import load_yaml
     from utils.logging import setup_logging
 
@@ -252,4 +252,4 @@ def _dry_run_config(cfg: Dict) -> Dict:
 
 if __name__ == "__main__":
     import sys
-    main(sys.argv[1] if len(sys.argv) > 1 else "configs/stage1a.yaml")
+    main(sys.argv[1] if len(sys.argv) > 1 else "configs/hardware/rtx4060_8g.yaml")

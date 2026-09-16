@@ -8,6 +8,7 @@
 torch/transformers 懒加载；显式加载经 ModelManager 分时管理。
 """
 import json
+import logging
 import random
 import re
 import uuid
@@ -28,16 +29,48 @@ from core.schemas import AttackAction, AttackState
 
 DEFAULT_TEMPLATE_PATH = "prompts/red/real_v1.yaml"
 
-_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
+logger = logging.getLogger("safeloop.red")
+
+_JSON_RE = re.compile(r"\{[^{}]*\}", re.DOTALL)  # 扁平对象，抗 <think> 等噪声
 
 
 def parse_red_json(text: str) -> Dict[str, str]:
     """容错解析红方 JSON 输出；失败 raise ValueError。"""
-    m = _JSON_RE.search(text)
-    payload = json.loads(m.group(0)) if m else json.loads(text)
+    payload = None
+    stripped = text.strip()
+    # 去掉 markdown 代码围栏
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```[a-zA-Z]*\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    for cand in _JSON_RE.findall(stripped) + _JSON_RE.findall(text):
+        try:
+            obj = json.loads(cand)
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and obj.get("prompt"):
+            payload = obj
+            break
+    if payload is None:
+        # 兜底 1：字段级正则（容忍缺逗号/多余文本）
+        m = re.search(
+            r'"strategy"\s*:\s*"([^"]+)"[\s,]*"prompt"\s*:\s*"(.+)"\s*\}?',
+            stripped, re.DOTALL)
+        if m:
+            payload = {"strategy": m.group(1), "prompt": m.group(2)}
+    if payload is None:
+        # 兜底 2：极宽容提取——实测 Qwen3-1.7B 会输出 "prompt"> ...（冒号误写为 >，
+        # JSON 未闭合）。strategy 取字段后的词，prompt 取到文本末尾。
+        ms = re.search(r'"strategy"\s*[:>]\s*"?([A-Za-z_]+)', stripped)
+        mp = re.search(r'"prompt"\s*[:>]\s*"?(.+?)\s*"?\s*\}?\s*$', stripped, re.DOTALL)
+        if ms and mp:
+            payload = {"strategy": ms.group(1), "prompt": mp.group(1).rstrip().rstrip("}")}
+    if payload is None:
+        logger.warning("red JSON parse failed, raw output: %.800s", text)
+        raise ValueError("cannot parse red output as JSON")
     strategy = str(payload.get("strategy", "")).strip()
     prompt = str(payload.get("prompt", "")).strip()
     if not prompt:
+        logger.warning("red JSON has empty prompt, raw output: %.800s", text)
         raise ValueError("empty prompt in red output")
     if strategy not in STRATEGY_ORDER:
         strategy = "direct" if not strategy else strategy
@@ -160,7 +193,8 @@ class HfRedAgent(BaseRedAgent):
             max_new_tokens=self.max_new_tokens,
             do_sample=do_sample,
             temperature=self.temperature, top_p=self.top_p,
-            device=self.device)
+            device=self.device,
+            template_kwargs={"enable_thinking": False})  # Qwen3 关闭思考模式
         try:
             parsed = parse_red_json(result["text"])
         except Exception as exc:  # 解析失败重试一次（§21 retry 不增加 Target query）
@@ -170,7 +204,8 @@ class HfRedAgent(BaseRedAgent):
                 self._model, self._tokenizer, messages,
                 max_new_tokens=self.max_new_tokens, do_sample=do_sample,
                 temperature=self.temperature, top_p=self.top_p,
-                device=self.device)
+                device=self.device,
+                template_kwargs={"enable_thinking": False})
             parsed = parse_red_json(result["text"])
 
         prev_strategy = (

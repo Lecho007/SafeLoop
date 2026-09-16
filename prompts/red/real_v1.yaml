@@ -20,7 +20,7 @@ user_template: |
   {history_block}
   [FEEDBACK]
   {feedback_block}
-  [OUTPUT] Respond with STRICT JSON only: {"strategy": ..., "prompt": ...}
+  [OUTPUT] Respond with STRICT JSON only: {{"strategy": ..., "prompt": ...}}
 
 history_item: |
   - round {round}: strategy={strategy}

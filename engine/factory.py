@@ -20,7 +20,7 @@ from core.protocol import ExperimentProtocol
 from core.reward import RewardConfig, RewardFunction
 from core.schemas import SafetyTask
 from engine.episode_runner import EpisodeRunner
-from engine.hf_backend import ModelManager
+from engine.hf_backend import ModelManager, quantization_spec
 from engine.provenance import collect_provenance
 from evaluation.base_evaluator import BaseEvaluator
 from evaluation.demo_evaluator import DemoEvaluator
@@ -109,6 +109,8 @@ def build_target(cfg: Dict, model_manager: "ModelManager" = None) -> BaseTarget:
             max_new_tokens=int(tcfg.get("max_new_tokens", 512)),
             temperature=float(tcfg.get("temperature", 1.0)),
             top_p=float(tcfg.get("top_p", 1.0)),
+            quantization=quantization_spec(
+                tcfg.get("quantization"), tcfg.get("compute_dtype", "bfloat16")),
         )
     raise ValueError("unknown target backend: {}".format(backend))
 
@@ -121,8 +123,9 @@ def build_evaluator(cfg: Dict, model_manager: "ModelManager" = None) -> BaseEval
     if backend == "strongreject_ft":
         return StrongRejectEvaluator(
             model_path=ecfg["model_path"],
+            base_model_path=ecfg.get("base_model_path"),
             model_manager=model_manager,
-            dtype=ecfg.get("dtype", "float16"),
+            dtype=ecfg.get("dtype", "bfloat16"),
             device=ecfg.get("device", "cuda"),
             success_threshold=float(ecfg.get("success_threshold", 0.5)),
         )
@@ -184,6 +187,20 @@ class RunnerBundle:
             "target": (cfg.get("target", {}) or {}).get("model_path"),
             "judge": (cfg.get("judge", {}) or {}).get("model_path"),
             "evaluator": (cfg.get("evaluator", {}) or {}).get("model_path"),
+        }
+        # 量化/精度策略入 provenance（设计：所有条件使用同一量化 Target，
+        # 只需记录清楚，不破坏研究设计）
+        tcfg = cfg.get("target", {}) or {}
+        self.provenance["quantization"] = {
+            "hardware": (cfg.get("hardware", {}) or {}),
+            "red": {"dtype": (cfg.get("red_agent", {}) or {}).get("dtype")},
+            "target": {
+                "quantization": quantization_spec(
+                    tcfg.get("quantization"), tcfg.get("compute_dtype", "bfloat16")),
+                "dtype": tcfg.get("dtype"),
+            },
+            "judge": {"dtype": (cfg.get("judge", {}) or {}).get("dtype")},
+            "evaluator": {"dtype": (cfg.get("evaluator", {}) or {}).get("dtype")},
         }
         self.backends_info = build_backends_info(
             cfg, self.red_agent, self.target, self.judge, self.evaluator)
