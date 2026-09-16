@@ -1,0 +1,4 @@
+weights/
+outputs/
+__pycache__/
+*.pyc

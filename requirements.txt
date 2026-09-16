@@ -1,0 +1,4 @@
+# SafeLoop-core：框架层依赖（设计文档 §25，保持 Python 3.8 兼容）
+# 训练类依赖（torch/transformers/peft/trl 等）等到对应 Stage 再加入，
+# 不要无脑安装最新版，需逐项检查 Python 3.8 兼容性。
+pyyaml>=5.4

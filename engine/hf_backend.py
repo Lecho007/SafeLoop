@@ -1,0 +1,126 @@
+# -*- coding: utf-8 -*-
+"""HF 后端基础设施（V0.3，设计文档 §36/§37）。
+
+V100 32GB 路线：分时加载（sequential loading）——同一时刻只有一个模型驻留 GPU：
+    load Red(4B) → 批量生成 → unload → load Target(7B) → … → unload
+    load Judge(4B) → 批量判定 → unload →（全部轮次结束后）load Evaluator(2B)。
+
+统一 dtype=float16（不用 BF16，V100 不支持或不适配 checkpoint metadata）。
+torch/transformers 一律懒加载：无 GPU 环境也能 import 本模块做协议测试。
+"""
+from typing import Any, Dict, Optional
+
+
+def resolve_dtype(dtype: str = "float16"):
+    import torch
+    return getattr(torch, dtype, torch.float16)
+
+
+def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda"):
+    """加载因果 LM + tokenizer（懒导入 transformers）。"""
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=False)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype=resolve_dtype(dtype),
+        device_map=None,
+    )
+    model.to(device)
+    model.eval()
+    return model, tokenizer
+
+
+def load_sequence_classifier(model_path: str, dtype: str = "float16", device: str = "cuda"):
+    """加载序列分类器（StrongREJECT 本地权重 fallback 路径）。"""
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_path, torch_dtype=resolve_dtype(dtype),
+    )
+    model.to(device)
+    model.eval()
+    return model, tokenizer
+
+
+def chat_generate(model, tokenizer, messages, max_new_tokens: int = 256,
+                   do_sample: bool = False, temperature: float = 1.0,
+                   top_p: float = 1.0, device: str = "cuda") -> Dict[str, Any]:
+    """按 chat template 生成，返回 {text, input_tokens, output_tokens}。"""
+    import torch
+
+    prompt_ids = tokenizer.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=True,
+        return_tensors="pt").to(device)
+    kwargs = dict(
+        inputs=prompt_ids,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+    )
+    if do_sample:
+        kwargs.update(temperature=temperature, top_p=top_p)
+    with torch.no_grad():
+        out = model.generate(**kwargs)
+    new_tokens = out[0][prompt_ids.shape[1]:]
+    return {
+        "text": tokenizer.decode(new_tokens, skip_special_tokens=True),
+        "input_tokens": int(prompt_ids.shape[1]),
+        "output_tokens": int(new_tokens.shape[0]),
+    }
+
+
+class ModelManager:
+    """单卡分时加载管理器：acquire(role) 时先释放上一个角色。
+
+    role ∈ {"red", "target", "judge", "evaluator"}；loader/unloader 由各 Adapter
+    注册。无 HF 后端（scripted/demo）时完全不触发加载。
+    """
+
+    def __init__(self) -> None:
+        self._current_role: Optional[str] = None
+        self._unloader: Optional[Any] = None
+        self.loaded_roles: list = []
+        self.call_counts: Dict[str, int] = {}
+
+    # ------------------------------------------------------------------
+    def acquire(self, role: str, loader) -> None:
+        """确保 role 对应模型驻留；切换角色时先卸载上一个（释放显存）。"""
+        if self._current_role != role:
+            self.release()
+            loader()
+            self._current_role = role
+            if role not in self.loaded_roles:
+                self.loaded_roles.append(role)
+
+    def register_unloader(self, unloader) -> None:
+        self._unloader = unloader
+
+    def release(self) -> None:
+        if self._unloader is not None:
+            try:
+                self._unloader()
+            finally:
+                self._unloader = None
+        if self._current_role is not None:
+            self._current_role = None
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+    def count(self, role: str) -> int:
+        return self.call_counts.get(role, 0)
+
+    def bump(self, role: str) -> None:
+        self.call_counts[role] = self.call_counts.get(role, 0) + 1
+
+    @property
+    def current_role(self) -> Optional[str]:
+        return self._current_role
+
+    def summary(self) -> Dict[str, int]:
+        return dict(self.call_counts)

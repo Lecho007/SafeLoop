@@ -1,0 +1,236 @@
+# -*- coding: utf-8 -*-
+"""组件工厂 V0.2：从 configs/stage1.yaml 装配闭环（设计文档 §32/§49）。
+
+配置拆成 protocol 与 backend 两层：protocol 描述实验协议（条件的公共部分），
+backend 描述模型后端。真实化只改 backend 字段，不改源码。
+"""
+import os
+import random
+from typing import Any, Dict, List, Optional
+
+from agents.base_judge import BaseJudge
+from agents.base_red_agent import BaseRedAgent
+from agents.hf_red_agent import HfRedAgent
+from agents.red_agent import TemplateRedAgent
+from agents.safety_judge import RuleBasedJudge
+from agents.qwen_guard_judge import QwenGuardJudge
+from core.coordinator import BaseCoordinator
+from core.coordinator_impl import HeuristicCoordinator
+from core.protocol import ExperimentProtocol
+from core.reward import RewardConfig, RewardFunction
+from core.schemas import SafetyTask
+from engine.episode_runner import EpisodeRunner
+from engine.hf_backend import ModelManager
+from engine.provenance import collect_provenance
+from evaluation.base_evaluator import BaseEvaluator
+from evaluation.demo_evaluator import DemoEvaluator
+from evaluation.offline_evaluator import OfflineEvaluator
+from evaluation.strongreject_evaluator import StrongRejectEvaluator
+from feedback.feedback_builder import FeedbackBuilder
+from memory.base_memory import BaseMemory
+from memory.null_memory import NullMemory
+from memory.trajectory_store import TrajectoryStore
+from scheduler.base_scheduler import BaseScheduler
+from scheduler.uniform_scheduler import UniformScheduler
+from targets.base_target import BaseTarget
+from targets.scripted_target import ScriptedTarget
+from targets.hf_target import HfTarget
+
+_DEFAULT_STRATEGIES = ["direct", "roleplay", "reframing", "obfuscation", "multi_turn"]
+
+
+def build_scheduler(cfg: Dict, rng: random.Random) -> BaseScheduler:
+    sched_cfg = cfg.get("scheduler", {}) or {}
+    if sched_cfg.get("type", "uniform") == "uniform":
+        return UniformScheduler(
+            risk_categories=sched_cfg.get(
+                "risk_categories", ["违法犯罪", "歧视偏见", "暴力恐怖",
+                                    "隐私侵犯", "虚假信息", "色情低俗"]),
+            attack_strategies=sched_cfg.get("attack_strategies", _DEFAULT_STRATEGIES),
+            rng=rng,
+        )
+    raise ValueError("unknown scheduler type: {}".format(sched_cfg.get("type")))
+
+
+def build_red_agent(cfg: Dict, rng: random.Random,
+                    model_manager: "ModelManager" = None) -> BaseRedAgent:
+    acfg = cfg.get("red_agent", {}) or {}
+    backend = acfg.get("backend", "template")
+    if backend == "template":
+        return TemplateRedAgent(
+            rng=rng,
+            template_path=acfg.get("template_path", "prompts/red/v1.yaml"),
+        )
+    if backend == "hf":
+        return HfRedAgent(
+            model_path=acfg["model_path"],
+            model_manager=model_manager,
+            template_path=acfg.get("template_path", "prompts/red/real_v1.yaml"),
+            dtype=acfg.get("dtype", "float16"),
+            device=acfg.get("device", "cuda"),
+            do_sample=bool(acfg.get("do_sample", True)),
+            temperature=float(acfg.get("temperature", 0.7)),
+            top_p=float(acfg.get("top_p", 0.9)),
+            max_new_tokens=int(acfg.get("max_new_tokens", 256)),
+            rng=rng,
+        )
+    raise ValueError("unknown red_agent backend: {}".format(backend))
+
+
+def build_judge(cfg: Dict, model_manager: "ModelManager" = None) -> BaseJudge:
+    jcfg = cfg.get("judge", {}) or {}
+    backend = jcfg.get("backend", "rule_based")
+    if backend == "rule_based":
+        return RuleBasedJudge(rules_path=jcfg.get("rules_path", "prompts/judge/v1.yaml"))
+    if backend == "qwen3guard":
+        return QwenGuardJudge(
+            model_path=jcfg["model_path"],
+            model_manager=model_manager,
+            template_path=jcfg.get("template_path", "prompts/judge/qwenguard_v1.yaml"),
+            dtype=jcfg.get("dtype", "float16"),
+            device=jcfg.get("device", "cuda"),
+            max_new_tokens=int(jcfg.get("max_new_tokens", 128)),
+        )
+    raise ValueError("unknown judge backend: {}".format(backend))
+
+
+def build_target(cfg: Dict, model_manager: "ModelManager" = None) -> BaseTarget:
+    tcfg = cfg.get("target", {}) or {}
+    backend = tcfg.get("backend", "scripted")
+    if backend == "scripted":
+        return ScriptedTarget(model_name=tcfg.get("model_name", "scripted-demo-1"))
+    if backend == "hf":
+        return HfTarget(
+            model_path=tcfg["model_path"],
+            model_manager=model_manager,
+            dtype=tcfg.get("dtype", "float16"),
+            device=tcfg.get("device", "cuda"),
+            do_sample=bool(tcfg.get("do_sample", False)),
+            max_new_tokens=int(tcfg.get("max_new_tokens", 512)),
+            temperature=float(tcfg.get("temperature", 1.0)),
+            top_p=float(tcfg.get("top_p", 1.0)),
+        )
+    raise ValueError("unknown target backend: {}".format(backend))
+
+
+def build_evaluator(cfg: Dict, model_manager: "ModelManager" = None) -> BaseEvaluator:
+    ecfg = cfg.get("evaluator", {}) or {}
+    backend = ecfg.get("backend", "demo")
+    if backend == "demo":
+        return DemoEvaluator()
+    if backend == "strongreject_ft":
+        return StrongRejectEvaluator(
+            model_path=ecfg["model_path"],
+            model_manager=model_manager,
+            dtype=ecfg.get("dtype", "float16"),
+            device=ecfg.get("device", "cuda"),
+            success_threshold=float(ecfg.get("success_threshold", 0.5)),
+        )
+    raise ValueError("unknown evaluator backend: {}".format(backend))
+
+
+def build_memory(cfg: Dict) -> BaseMemory:
+    if (cfg.get("memory", {}) or {}).get("enabled", False):
+        raise NotImplementedError("真实 Attack Memory 在 Stage 2 接入")
+    return NullMemory()
+
+
+def build_backends_info(cfg: Dict, red: BaseRedAgent, target: BaseTarget,
+                        judge: BaseJudge, evaluator: BaseEvaluator) -> Dict[str, Dict]:
+    return {
+        "red": {"backend": red.name, "template_version": red.template_version},
+        "target": {"backend": target.name, "model": getattr(target, "model_name", "")},
+        "judge": {"backend": judge.name, "version": judge.version},
+        "evaluator": {"backend": evaluator.name,
+                      "version": getattr(evaluator, "version", "")},
+    }
+
+
+def load_tasks(cfg: Dict, base_dir: str = ".") -> List[SafetyTask]:
+    tasks_file = (cfg.get("experiment", {}) or {}).get(
+        "tasks_file", "data/tasks/test.jsonl")
+    path = tasks_file if os.path.isabs(tasks_file) else os.path.join(base_dir, tasks_file)
+    tasks: List[SafetyTask] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                import json
+                tasks.append(SafetyTask.from_dict(json.loads(line)))
+    return tasks
+
+
+class RunnerBundle:
+    """按条件装配好的全套组件（共享后端实例，条件间严格同源）。"""
+
+    def __init__(self, cfg: Dict, config_path: str = "configs/stage1.yaml") -> None:
+        self.cfg = cfg
+        self.config_path = config_path
+        self.seed = (cfg.get("experiment", {}) or {}).get("seed", 42)
+        self.model_manager = ModelManager()
+        self.red_agent = build_red_agent(cfg, random.Random(self.seed),
+                                         self.model_manager)
+        self.target = build_target(cfg, self.model_manager)
+        self.judge = build_judge(cfg, self.model_manager)
+        self.evaluator = build_evaluator(cfg, self.model_manager)
+        self.memory = build_memory(cfg)
+        self.feedback_builder = FeedbackBuilder()
+        self.reward_config = RewardConfig(**(cfg.get("reward", {}) or {}))
+        self.provenance = collect_provenance(
+            config_path, cfg, self.red_agent, self.target, self.judge, self.evaluator,
+        )
+        self.provenance["model_paths"] = {
+            "red": (cfg.get("red_agent", {}) or {}).get("model_path"),
+            "target": (cfg.get("target", {}) or {}).get("model_path"),
+            "judge": (cfg.get("judge", {}) or {}).get("model_path"),
+            "evaluator": (cfg.get("evaluator", {}) or {}).get("model_path"),
+        }
+        self.backends_info = build_backends_info(
+            cfg, self.red_agent, self.target, self.judge, self.evaluator)
+
+    def make_coordinator(self, protocol: ExperimentProtocol) -> BaseCoordinator:
+        return HeuristicCoordinator(build_scheduler(self.cfg, random.Random(self.seed)))
+
+    def make_reward_fn(self, budget: int) -> RewardFunction:
+        return RewardFunction(self.reward_config, budget)
+
+    def make_protocol(self, condition_id: str, condition_cfg: Dict[str, Any],
+                      experiment_id: str) -> ExperimentProtocol:
+        proto_cfg = self.cfg.get("protocol", {}) or {}
+        return ExperimentProtocol(
+            experiment_id=experiment_id,
+            condition_id=condition_id,
+            target_query_budget=int(condition_cfg.get(
+                "target_query_budget", proto_cfg.get("target_query_budget", 5))),
+            feedback_level=condition_cfg["feedback_level"],
+            allow_target_response_history=bool(
+                proto_cfg.get("allow_target_response_history", True)),
+            memory_enabled=bool(proto_cfg.get("memory_enabled", False)),
+            scheduler_type=proto_cfg.get("scheduler", "uniform"),
+            training_enabled=bool(proto_cfg.get("training_enabled", False)),
+            initial_seed_policy=proto_cfg.get("initial_seed_policy", "fixed_direct"),
+        )
+
+    def make_runner(self, protocol: ExperimentProtocol,
+                    save_trajectory: bool = True) -> EpisodeRunner:
+        # 每个条件独立同种子 RNG，保证同起点；协调器按协议初始化
+        scheduler = build_scheduler(self.cfg, random.Random(self.seed))
+        coordinator: BaseCoordinator = HeuristicCoordinator(scheduler)
+        reward_fn = RewardFunction(self.reward_config, protocol.target_query_budget)
+        return EpisodeRunner(
+            coordinator=coordinator,
+            red_agent=self.red_agent,
+            target=self.target,
+            judge=self.judge,
+            memory=self.memory,
+            reward_fn=reward_fn,
+            feedback_builder=self.feedback_builder,
+            trajectory_store=TrajectoryStore() if save_trajectory else None,
+            provenance=self.provenance,
+            experiment_name="{}_{}".format(
+                (self.cfg.get("experiment", {}) or {}).get("name", "exp"),
+                protocol.condition_id),
+        )
+
+    def make_offline_evaluator(self) -> OfflineEvaluator:
+        return OfflineEvaluator(evaluator=self.evaluator)

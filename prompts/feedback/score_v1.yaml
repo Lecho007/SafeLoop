@@ -1,0 +1,3 @@
+# F1 Score-only 反馈模板 v1
+version: feedback-score-v1
+note: "只提供分数，不提供自然语言解释与 outcome。"

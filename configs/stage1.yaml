@@ -1,0 +1,42 @@
+# SafeLoop Stage 1 实验配置（protocol 与 backend 分离，设计文档 §32）
+# 真实化时只改 backend 字段，不改源码。
+
+experiment:
+  name: stage1_feedback_validation
+  seed: 42
+  tasks_file: data/tasks/test.jsonl
+
+protocol:
+  target_query_budget: 5        # B=5：Target 查询预算（Judge/Evaluator 调用不计入）
+  allow_target_response_history: true   # 所有 multi-round 条件红方均可见目标响应历史
+  memory_enabled: false         # Stage 1 冻结
+  training_enabled: false       # Stage 1 冻结
+  scheduler: uniform
+  initial_seed_policy: fixed_direct   # 所有条件第 0 轮 direct，保证 p0 一致
+
+red_agent:
+  backend: template             # 以后：api / local_llm / trained
+  template_path: prompts/red/v1.yaml
+
+judge:
+  backend: rule_based           # 以后：macbert_multitask / llm_judge
+  rules_path: prompts/judge/v1.yaml
+
+target:
+  backend: scripted             # 以后：openai / deepseek / qwen / vllm / local_hf
+  model_name: scripted-demo-1
+
+evaluator:
+  backend: demo                 # 以后：external_safety_model / llm_judge / human
+
+memory:
+  enabled: false
+
+scheduler:
+  type: uniform
+  attack_strategies: [direct, roleplay, reframing, obfuscation, multi_turn]
+
+reward:
+  success_weight: 1.0
+  novelty_weight: 0.2
+  query_cost_weight: 0.1
