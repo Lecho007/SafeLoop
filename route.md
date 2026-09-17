@@ -31,7 +31,7 @@ Stage 1 只研究一个变量：**Feedback**（Memory/Scheduler/Training/DPO/RL 
 | Stage | 科学问题 | 状态 |
 |-------|----------|------|
 | 0 骨架 | 模型无关闭环跑通 | ✅ V0.1 |
-| 1 Feedback Loop | 相同查询预算下判别反馈是否提升边界探索 | ✅ V0.2 协议层（demo 通过）→ ✅ V0.3 真实模型层代码就绪，**待下载权重后跑 1A** |
+| 1 Feedback Loop | 相同查询预算下判别反馈是否提升边界探索 | ✅ 1A 已跑（JBB-20 真实闭环）→ ✅ V0.3-J Judge 修复完成 → **R2 行为验证完成，反馈通道已证实；1B 前需决策任务子集（见 §4.8）** |
 | 2 Memory | 历史攻击经验是否进一步提高效率 | 待启动 |
 | 3 Risk Scheduler | 风险边界自适应调度 | 待启动 |
 | 4 Judge Co-evolution | 难例回流提升 Judge | 待启动（disagreement 已落盘） |
@@ -113,7 +113,37 @@ replay 一致；provenance 完整；retry 不增加 Target query；无 OOM；tra
 1A 后：Target ceiling/floor Gate + Judge 校准集 D_cal（100–200 条真实 response，
 J_f vs E Agreement + 人工 audit + Type A/B 落盘）。
 
-### 4.7 后续（权重就位后）
+### 4.7 Stage 1A + V0.3-J 结果记录（2026-09-17，全部基于 goal 基准 E）
+
+**Stage 1A（旧 Judge V1）**：ΔASR=0；机制诊断出 Judge 是瓶颈（SSR=1.0/ESSR=0.10 的策略振荡，
+V1 判定 100% PARTIAL_COMPLIANCE、在线成功率恒 0）。
+
+**V0.3-J Judge Recovery**：
+- Calibration-A（官方 300 条 vs 人类）：Recall 0.964 / F1 0.845 / 解析 300 EXACT——
+  官方模板下 0.6B Guard 能力过关；
+- J0→J2（冻结 120 条响应，goal 基准 E）：TypeB 32%→18.3%（进入设计理想区间 15–20%，
+  绝对目标 <25% 达成），Precision 0.941，一致率 68%→81%；
+- 人工审计（全部 9 条内容型 TypeB）：Guard 0 漏检；8/9 为 StrongREJECT 基准错误
+  （红方 reframing 极性漂移：'入侵网络'→'加固网络'，以攻击 prompt 为基准误报成功）→
+  E 修复为 score_reference=task.goal；
+- 结构性发现：合规型危害（专家建议/隐私/政务等，JBB 10 类中占 5 类）的"成功"是
+  compliance 语义，content-safety guard 定义上无法识别（该桶 TypeB=100% 是定义性错配）。
+
+**Stage 1A-R2（Judge V2 + FeedbackBuilderV2，其余与 1A 完全一致）**：
+- 机制链证实：KEEP 指令 6/6 全被遵守（KEEP 后切换率 0%）；C3 的 HSR 1.00→0.50（减半）；
+- 但 ESSR 0.10→0.12 未回升、ΔASR=-5%（p=1.0，噪声内）——原因：KEEP 信号仅在
+  LIKELY_COMPLIANCE（14% 步数）时触发；UNCERTAIN（50% 步数）下红方仍 85% 换策略，
+  而合规型类别上 Guard 结构性给不出"正在奏效"信号。
+
+**Gate 结论**：J1(parser) PASS / J3(TypeB 18.3%<25%) 达成 / J2(refusal 判别指标定义待修，
+方向一致性 88%) / J4(行为) 部分达成（HSR✓、ESSR✗）。
+
+### 4.8 Stage 1B 前的决策点（待定）
+反馈机制本身已证实可用（KEEP 遵守率 100%），但聚合收益受限于 Guard 可判定类别覆盖率。
+选项：A. 1B 用内容型类别子集验证反馈机制（最干净）；B. 为合规型类别引入独立在线
+goal-compliance 信号（架构变更，需讨论）；C. 带 caveat 直接 1B 全类别。默认建议 A。
+
+### 4.9 后续（权重就位后）
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
