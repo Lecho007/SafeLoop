@@ -1,10 +1,14 @@
 # SafeLoop 命令文档 环境配置指南
 
-## 环境配置（2026-09-16 已重建为 Python 3.10 并实测可用）
+## 环境配置（2026-09-17 最终锁定，Python 3.10，全部实测可用）
 
-> ⚠️ 版本变更说明：原计划的 Python 3.8 无法运行 Qwen3——Qwen3 架构需要
-> transformers ≥ 4.51，而 transformers 从 4.49 起放弃 Python 3.8（实测 4.46.3 报
-> "model type qwen3 not recognized"）。环境已重建为 Python 3.10，以下为实测可用组合：
+> ⚠️ 版本变更履历（为什么不是最初计划的 py3.8 + torch 2.1.0）：
+> 1. Python 3.8 → 3.10：Qwen3 架构需要 transformers ≥ 4.51，而 transformers 4.49 起
+>    放弃 py3.8（实测 4.46.3 报 "model type qwen3 not recognized"）；
+> 2. torch 2.1.0 → **2.1.2**：transformers 的 SDPA attention 要求 torch ≥ 2.1.1，
+>    而 4-bit Target 必须走 SDPA（eager attention 的 fp16 大矩阵 matmul 在 4060 上
+>    触发 CUBLAS_STATUS_EXECUTION_FAILED，Stage 1A 首跑实锤）；
+> 3. numpy 锁 1.26.x：torch 2.1.x 按 numpy 1.x 编译，numpy 2.x 报 _ARRAY_API 错。
 
 ```bash
 mamba create -n safeLoop python=3.10 -y
@@ -12,11 +16,29 @@ mamba activate safeLoop
 
 # 实测锁定版本（RTX 4060 Laptop / WSL2 / CUDA 可用）
 pip install torch==2.1.2 transformers==4.53.2 peft==0.15.2 accelerate==1.7.0 bitsandbytes==0.45.5 pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install "numpy<2"    # 必需：torch 2.1 按 numpy 1.x 编译，numpy 2.x 会报 _ARRAY_API 错误
+pip install "numpy<2"     # 装成 numpy 1.26.4
+
+# 版本冻结清单（升级任何一个前先看理由）：
+#   transformers==4.53.2  Qwen3/Qwen3Guard/Phi-3.5/gemma 支持 + py3.10 可用
+#   torch==2.1.2+cu121    SDPA 需 >=2.1.1；cu121 runtime 与新驱动向后兼容
+#   peft==0.15.2          StrongREJECT LoRA 本地加载/合并
+#   bitsandbytes==0.45.5  Target 4-bit NF4
+#   accelerate==1.7.0     device_map 加载路径
+#   numpy<2               torch 2.1.x 编译兼容
+
+# 环境自检（应全部输出正常）
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+python -c "import torch; x=torch.randn(4,4,dtype=torch.bfloat16).cuda(); print(torch.nn.functional.scaled_dot_product_attention(x,x,x).shape)"
+python -m unittest discover -s tests    # 52 项全过
 ```
 
 环境路径：`/home/MMCP/miniforge3/envs/safeLoop`（下文以 `$PY` 代指
 `/home/MMCP/miniforge3/envs/safeLoop/bin/python`，或先 `mamba activate safeLoop`）。
+
+长跑（Stage 1A/R2 级别）建议带防碎片分配器：
+```bash
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY scripts/run_stage1a.py ...
+```
 
 > CUDA 兼容提示：驱动显示的 CUDA 版本（如 13.x）高于 PyTorch 自带 runtime（cu121）无需处理，
 > 只要 `torch.cuda.is_available() == True` 且基础 tensor 测试正常就继续用。
@@ -121,6 +143,17 @@ python scripts/check_weights.py configs/hardware/rtx4060_8g.yaml
 python scripts/run_experiment.py [configs/stage1.yaml]
 python scripts/run_episode.py [configs/stage1.yaml] [C0|C1|C2|C3] [task_index]
 python scripts/replay_trajectory.py outputs/trajectories/<file>.jsonl --level structured
+
+# ---- V0.3-J Judge Recovery（修复后 Judge，均离线，不调 Target）----
+export PYTHONPATH=.
+$PY scripts/calibrate_judge.py                    # Calibration-A：官方 300 条 vs 人类
+$PY experiments/stage1aj.py                       # J0/J1/J2 对照（冻结 120 条响应）+ Gate
+$PY scripts/reevaluate.py outputs/trajectories/<exp>_C1.jsonl outputs/trajectories/<exp>_C3.jsonl
+                                                  # goal 基准重评（原文件备份 .bak）
+
+# Stage 1A-R2（judge v2 + feedback v2，其余与 1A 完全一致）
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY scripts/run_stage1a.py \
+    --config configs/hardware/rtx4060_8g_r2.yaml
 
 # Judge 校准集（1A 完成后）
 python scripts/build_calibration_set.py outputs/evaluations/stage1a_smoke_4060_C3.jsonl \
