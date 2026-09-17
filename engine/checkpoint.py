@@ -64,13 +64,14 @@ def rebuild_from_payload(payload: Dict[str, Any], budget: int):
         target_id=task.metadata.get("target_id", "default-target"),
         round_id=int(st["round_id"]),
         target_queries_used=int(st["target_queries_used"]),
-        target_query_budget=budget,
+        target_query_budget=budget,   # resume 时用当前协议预算重算 done
         current_strategy=st.get("current_strategy", ""),
         history=steps,
         last_feedback=(
             Feedback.from_dict(st["last_feedback"]) if st.get("last_feedback") else None),
-        stop_reason="budget_exhausted" if payload.get("done") else None,
     )
+    # done 不信任存档值（可能按旧预算写入，如 B=3→5 扩预算续跑），按当前状态重算
+    state.stop_reason = "budget_exhausted" if state.done else None
     traj = AttackTrajectory(
         trajectory_id=payload["trajectory_id"],
         experiment_id="",

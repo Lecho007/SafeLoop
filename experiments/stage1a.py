@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Dict
 
-from core.protocol_validator import ProtocolValidator
+from core.protocol_validator import ProtocolValidator, check_conditions_match_config
 from core.schemas import SafetyTask
 from engine.batch_runner import BatchRunner
 from engine.cost import summarize_all, summarize_trajectory
@@ -46,7 +46,16 @@ class Stage1AExperiment:
         self.experiment_id = (cfg.get("experiment", {}) or {}).get(
             "name", "stage1a_smoke")
         self.bundle = RunnerBundle(cfg, config_path)
-        self.conditions = conditions or STAGE1A_CONDITIONS
+        if conditions is None:
+            conditions = {
+                c: dict(ccfg) for c, ccfg in STAGE1A_CONDITIONS.items()}
+            # 协议配置注入（1B-A 教训：曾因硬编码 B=3 导致配置 B=5 被忽略）
+            proto_cfg = cfg.get("protocol", {}) or {}
+            budget = int(proto_cfg.get("target_query_budget", 0))
+            if budget:
+                for c in conditions:
+                    conditions[c]["target_query_budget"] = budget
+        self.conditions = conditions
         self.tasks = load_tasks(cfg)
         self.resume = resume
         # 断点续跑检查点：每个 round 完成后原子落盘
@@ -63,7 +72,8 @@ class Stage1AExperiment:
             c: self.bundle.make_protocol(c, ccfg, self.experiment_id)
             for c, ccfg in self.conditions.items()
         }
-        validation_lines = []
+        validation_lines = check_conditions_match_config(
+            self.conditions, self.cfg.get("protocol", {}))
         base_cond, aug_cond = MAIN_COMPARISON
         allowed = ALLOWED_PAIR_DIFFERENCES.get(frozenset(self.conditions))
         if allowed:

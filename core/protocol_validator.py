@@ -28,6 +28,25 @@ class ProtocolViolation(Exception):
     pass
 
 
+def check_conditions_match_config(conditions: Dict, protocol_cfg: Dict) -> List[str]:
+    """条件定义与实验配置一致性（1B-A 教训：防 budget 硬编码漂移）。"""
+    lines = []
+    budget = int((protocol_cfg or {}).get("target_query_budget", 0))
+    if budget:
+        for c, ccfg in conditions.items():
+            actual = int(ccfg.get("target_query_budget", 0))
+            if c == "C0":
+                continue  # 单轮 reference baseline 允许 B=1
+            if actual != budget:
+                raise ProtocolViolation(
+                    "condition {} budget {} != config protocol.target_query_budget "
+                    "{}（Stage1AExperiment 已改为配置注入，请勿绕过）".format(
+                        c, actual, budget))
+        lines.append("[PASS] condition budgets match config "
+                     "(target_query_budget={})".format(budget))
+    return lines
+
+
 class ProtocolValidator:
     @staticmethod
     def compare_protocols(

@@ -100,3 +100,31 @@ class TestCheckpointResume(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBudgetExtendResume(unittest.TestCase):
+    def test_b3_checkpoint_extends_to_b5(self):
+        """B=3 跑完的检查点，用 B=5 协议 resume：应续跑第 3/4 轮而非跳过。"""
+        import shutil, tempfile, os
+        tmp = tempfile.mkdtemp()
+        ckpt = os.path.join(tmp, "c.json")
+        _run(ckpt)  # STAGE1A_CONDITIONS B=3
+        # 用 B=5 resume（模拟 1B-A 配置注入场景）
+        from engine.factory import RunnerBundle
+        from engine.batch_runner import BatchRunner
+        from experiments.conditions import STAGE1A_CONDITIONS
+        from utils.io import load_yaml
+        cfg = load_yaml(CFG_PATH)
+        bundle = RunnerBundle(cfg, CFG_PATH)
+        conds = {c: dict(v, target_query_budget=5) for c, v in STAGE1A_CONDITIONS.items()}
+        protocols = {c: bundle.make_protocol(c, cc, "ckpt-ext") for c, cc in conds.items()}
+        batch = BatchRunner(
+            coordinator_factory=lambda pr: bundle.make_coordinator(pr),
+            red_agent=bundle.red_agent, target=bundle.target, judge=bundle.judge,
+            memory=bundle.memory, reward_factory=lambda b: bundle.make_reward_fn(b),
+            feedback_builder=bundle.feedback_builder, provenance=bundle.provenance)
+        result = batch.run(_tasks(), protocols, checkpoint_path=ckpt, resume=True)
+        for c, ts in result.items():
+            for t in ts:
+                self.assertEqual(t.target_queries, 5)
+        shutil.rmtree(tmp, ignore_errors=True)

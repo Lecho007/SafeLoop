@@ -100,9 +100,10 @@ class BatchRunner:
                         p, protocol.target_query_budget)
                     traj.experiment_id = protocol.experiment_id
                     traj.provenance = self.provenance
+                    # done 以重建后的 state 为准（支持扩预算续跑）
                     slots.append(_EpisodeSlot(
-                        p["condition_id"], task, state, traj, coordinator))
-                    slots[-1].done = done
+                        p["condition_id"], task, state, traj, coordinator,
+                        done=state.done))
             else:
                 logger.info("checkpoint missing/corrupt, cold start")
         if not slots:
