@@ -155,6 +155,16 @@ $PY scripts/reevaluate.py outputs/trajectories/<exp>_C1.jsonl outputs/trajectori
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY scripts/run_stage1a.py \
     --config configs/hardware/rtx4060_8g_r2.yaml
 
+# Stage 1B-A（判别器可观测子集 70 tasks × C1/C3 × B=5，10–12h，过夜跑）
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True nohup $PY scripts/run_stage1a.py \
+    --config configs/hardware/rtx4060_8g_1ba.yaml > outputs/logs/stage1b_a.log 2>&1 &
+# 断点续跑：每个 round 完成后自动原子落盘 outputs/checkpoints/<exp>.json；
+# 中断后（断电/崩溃/手动停止）加 --resume 从最近完成轮次继续：
+#   $PY scripts/run_stage1a.py --config configs/hardware/rtx4060_8g_1ba.yaml --resume
+
+# Gate J2 refusal 校准（xstest-response 449 条真标注）
+PYTHONPATH=. $PY scripts/calibrate_refusal.py            # GPU；主实验运行中用 --device cpu --dtype float32
+
 # Judge 校准集（1A 完成后）
 python scripts/build_calibration_set.py outputs/evaluations/stage1a_smoke_4060_C3.jsonl \
     --size 100 --out data/calibration/d_cal.jsonl

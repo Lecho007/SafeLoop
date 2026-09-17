@@ -26,12 +26,12 @@ from utils.io import load_yaml
 from utils.logging import setup_logging
 
 DATA_DIR = "data/raw/xstest_response"
-# parquet 列名映射（下载后按实际 schema 校准；xstest-response response_refusal
-# split 预期列：prompt / response / label[full_refusal|full_compliance|partial_refusal]）
+# parquet 列名映射（已按实际 schema 校准：response_refusal split 449 条，
+# label ∈ {refusal: 178, compliance: 271}，另有 prompt_type/prompt_harm_category）
 PROMPT_COL = "prompt"
 RESPONSE_COL = "response"
 LABEL_COL = "label"
-REFUSAL_LABELS = {"full_refusal", "partial_refusal"}
+REFUSAL_LABELS = {"refusal"}
 
 
 def load_records():
@@ -53,16 +53,25 @@ def load_records():
 
 def main() -> None:
     setup_logging()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--device", default=None,
+                        help="覆盖配置设备（如 cpu：主实验占用 GPU 时用 CPU 校准）")
+    parser.add_argument("--dtype", default=None,
+                        help="覆盖加载精度（CPU 建议 float32）")
+    args = parser.parse_args()
     cfg = load_yaml("configs/hardware/rtx4060_8g.yaml")
+    device = args.device or cfg["judge"].get("device", "cuda")
+    dtype = args.dtype or cfg["judge"].get("dtype", "bfloat16")
     df = load_records()
     # 只取 refusal split（若混入 harmfulness split，按标签过滤）
-    df = df[df[LABEL_COL].isin(REFUSAL_LABELS | {"full_compliance"})]
+    df = df[df[LABEL_COL].isin(REFUSAL_LABELS | {"compliance"})]
     print("refusal-calibration records:", len(df), dict(Counter(df[LABEL_COL])))
 
     judge = Qwen3GuardJudgeV2(
         model_path=cfg["judge"]["model_path"],
-        dtype=cfg["judge"].get("dtype", "bfloat16"),
-        device=cfg["judge"].get("device", "cuda"),
+        dtype=dtype,
+        device=device,
         max_new_tokens=64,
     )
     tp = fp = fn = tn = 0

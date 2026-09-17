@@ -17,6 +17,7 @@ from typing import Dict, List, Optional
 
 from core.coordinator import BaseCoordinator
 from core.protocol import ExperimentProtocol
+from engine.checkpoint import load_checkpoint, rebuild_from_payload, save_checkpoint, slot_to_payload
 from core.schemas import (
     AttackState,
     AttackStep,
@@ -77,32 +78,62 @@ class BatchRunner:
         tasks: List[SafetyTask],
         protocols: Dict[str, ExperimentProtocol],
         trajectory_store: Optional[TrajectoryStore] = None,
+        checkpoint_path: Optional[str] = None,
+        resume: bool = False,
     ) -> Dict[str, List[AttackTrajectory]]:
-        slots: List[_EpisodeSlot] = []
-        for cond_id, protocol in protocols.items():
-            coordinator = self.coordinator_factory(protocol)
-            for task in tasks:
-                state = coordinator.initialize(task, protocol)
-                traj = AttackTrajectory(
-                    trajectory_id=new_trajectory_id(),
-                    experiment_id=protocol.experiment_id,
-                    condition_id=cond_id,
-                    task=task,
-                    target_id=state.target_id,
-                    provenance=self.provenance,
-                )
-                slots.append(_EpisodeSlot(cond_id, task, state, traj, coordinator))
-
         max_budget = max(p.target_query_budget for p in protocols.values())
         reward_fns = {
             cond: self.reward_factory(p.target_query_budget)
             for cond, p in protocols.items()
         }
 
+        slots: List[_EpisodeSlot] = []
+        if resume and checkpoint_path:
+            payloads = load_checkpoint(checkpoint_path)
+            if payloads:
+                logger.info("resume from checkpoint: %d slots (%s)",
+                            len(payloads), checkpoint_path)
+                for p in payloads:
+                    protocol = protocols[p["condition_id"]]
+                    coordinator = self.coordinator_factory(protocol)
+                    task, state, traj, done = rebuild_from_payload(
+                        p, protocol.target_query_budget)
+                    traj.experiment_id = protocol.experiment_id
+                    traj.provenance = self.provenance
+                    slots.append(_EpisodeSlot(
+                        p["condition_id"], task, state, traj, coordinator))
+                    slots[-1].done = done
+            else:
+                logger.info("checkpoint missing/corrupt, cold start")
+        if not slots:
+            for cond_id, protocol in protocols.items():
+                coordinator = self.coordinator_factory(protocol)
+                for task in tasks:
+                    state = coordinator.initialize(task, protocol)
+                    traj = AttackTrajectory(
+                        trajectory_id=new_trajectory_id(),
+                        experiment_id=protocol.experiment_id,
+                        condition_id=cond_id,
+                        task=task,
+                        target_id=state.target_id,
+                        provenance=self.provenance,
+                    )
+                    slots.append(_EpisodeSlot(cond_id, task, state, traj, coordinator))
+
+        def _write_checkpoint() -> None:
+            if checkpoint_path:
+                save_checkpoint(checkpoint_path, [
+                    slot_to_payload(s.condition_id, s.task, s.state, s.trajectory, s.done)
+                    for s in slots])
+
         for _round in range(max_budget):
-            active = [s for s in slots if not s.state.done]
+            # 按 slot 自身 round_id 过滤：续跑时已完成轮次自然跳过
+            active = [s for s in slots
+                      if not s.state.done and s.state.round_id == _round]
             if not active:
-                break
+                if all(s.state.done for s in slots):
+                    break
+                continue
             logger.info("round %d: %d active episodes", _round, len(active))
 
             # Phase 1: Red 驻留，批量生成 action
@@ -173,6 +204,8 @@ class BatchRunner:
                 slot.pending_action = None
                 slot.pending_response = None
                 slot.pending_judge = None
+
+            _write_checkpoint()  # 每个 round 原子落盘（断点续跑）
 
         result: Dict[str, List[AttackTrajectory]] = {}
         for slot in slots:

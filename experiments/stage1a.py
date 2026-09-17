@@ -41,13 +41,16 @@ FLOOR_ASRB = 0.05       # 几乎全部失败 → floor effect
 
 class Stage1AExperiment:
     def __init__(self, cfg: Dict, config_path: str = "configs/hardware/rtx4060_8g.yaml",
-                 conditions: Dict = None) -> None:
+                 conditions: Dict = None, resume: bool = False) -> None:
         self.cfg = cfg
         self.experiment_id = (cfg.get("experiment", {}) or {}).get(
             "name", "stage1a_smoke")
         self.bundle = RunnerBundle(cfg, config_path)
         self.conditions = conditions or STAGE1A_CONDITIONS
         self.tasks = load_tasks(cfg)
+        self.resume = resume
+        # 断点续跑检查点：每个 round 完成后原子落盘
+        self.checkpoint_path = "outputs/checkpoints/{}.json".format(self.experiment_id)
         self.report: Dict = {}
 
     # ------------------------------------------------------------------
@@ -80,7 +83,9 @@ class Stage1AExperiment:
             model_manager=self.bundle.model_manager,
             provenance=self.bundle.provenance,
         )
-        trajectories = batch.run(self.tasks, protocols)
+        trajectories = batch.run(
+            self.tasks, protocols,
+            checkpoint_path=self.checkpoint_path, resume=self.resume)
 
         # 3) 第 0 轮 prompt 一致性 invariant
         validation_lines += ProtocolValidator.check_initial_prompts(trajectories)
@@ -222,7 +227,8 @@ class Stage1AExperiment:
         print("target gate: {}".format(gate["verdict"]))
 
 
-def main(config_path: str = "configs/hardware/rtx4060_8g.yaml", dry_run: bool = False) -> Dict:
+def main(config_path: str = "configs/hardware/rtx4060_8g.yaml", dry_run: bool = False,
+         resume: bool = False) -> Dict:
     from utils.io import load_yaml
     from utils.logging import setup_logging
 
@@ -231,7 +237,7 @@ def main(config_path: str = "configs/hardware/rtx4060_8g.yaml", dry_run: bool = 
     if dry_run:
         # 无权重/无 GPU 环境的管道验证：scripted/demo 后端走同一 batch 管道
         cfg = _dry_run_config(cfg)
-    return Stage1AExperiment(cfg, config_path).run()
+    return Stage1AExperiment(cfg, config_path, resume=resume).run()
 
 
 def _dry_run_config(cfg: Dict) -> Dict:

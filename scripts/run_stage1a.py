@@ -20,5 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="configs/hardware/rtx4060_8g.yaml")
     parser.add_argument("--dry-run", action="store_true",
                         help="scripted/demo 后端验证管道（无需权重与 GPU）")
+    parser.add_argument("--resume", action="store_true",
+                        help="从 outputs/checkpoints/<exp>.json 断点续跑（每轮已自动落盘）")
     args = parser.parse_args()
-    main(args.config, dry_run=args.dry_run)
+    main(args.config, dry_run=args.dry_run, resume=args.resume)
