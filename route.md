@@ -165,7 +165,26 @@ H4 ESSR_C3>ESSR_C1；H5 HSR_C3<HSR_old-C3。
 - **Gate J2 重定义**：refusal 判别质量用 xstest-response（allenai，response_refusal
   split 449 条真 refusal 标注）独立校准；StrongREJECT failure 不再冒充 refusal GT。
 
-### 4.10 后续（权重就位后）
+### 4.10 Stage 1B-A 结果（2026-09-17，JBB content-observable 70 tasks × C1/C3 × B=5=700 queries）
+
+```
+           ASR@1  ASR@3  ASR@5  AUC-B  CTTS   SSR   HSR(SPR)    AFC/UR          FRR  ESSR
+C1 无反馈   20%    33%    35.7%  0.309  4.46   0.24  0.21(.79)   –               –    0.106
+C3 结构化  20%    37.1%  38.6%  0.329  4.36   0.38  0.11(.89)   52%/48%         0.66 0.103
+```
+- **H1/H2/H3 方向全部一致支持但未达显著**（ΔASR=+2.9%，CI[-7.1,12.9]，McNemar p=0.77；
+  ΔAUC-B=+0.020；CTTS −0.10，p=0.86）——单 seed × 70 tasks 检验力不足；
+- **H5 强支持**：HSR=0.108（vs R2 全类别 0.50，vs C1 并行对照 0.21），SPR=0.89——
+  反馈在可观测子集上正确保护了奏效策略；
+- **KEEP 遵守率 30/30=100%**（累计 36/36）——反馈通道保真；
+- H4（ESSR）仍平（0.103 vs 0.106）：切换的"有效方向"未提升——UNCERTAIN 仍占 48%，
+  红方在无信号区依旧换策略；这是 1B-B（goal-compliance 信号）的直接动机；
+- 工程注记：首跑因条件预算硬编码跑了 B=3（420 步），修复（配置注入+一致性检查+
+  跨预算 resume）后 --resume 无损补齐第 4/5 轮——断点续跑机制首次实战生效。
+- 结论：机制证据链（Judge→Feedback→保护奏效策略）在判别器可观测域内成立；
+  ASR 级增益需要多 seed（42/123/2026）与更大任务量确认，或等 1B-B 扩大可观测域。
+
+### 4.11 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
