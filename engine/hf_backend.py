@@ -65,12 +65,14 @@ def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda"
                 bnb_4bit_compute_dtype=resolve_dtype(spec.get("compute_dtype", dtype)),
             ),
             device_map={"": _device_index(device)},
+            attn_implementation="sdpa",   # 避免 eager 大矩阵 matmul（CUBLAS 崩溃根因）
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=resolve_dtype(dtype),
             device_map=None,
+            attn_implementation="sdpa",
         )
         model.to(device)
     model.eval()
@@ -113,18 +115,71 @@ def chat_generate(model, tokenizer, messages, max_new_tokens: int = 256,
         prompt_ids = _apply(False)
     kwargs = dict(
         inputs=prompt_ids,
+        attention_mask=torch.ones_like(prompt_ids),  # pad==eos 时必须显式传入
         max_new_tokens=max_new_tokens,
         do_sample=do_sample,
         pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
     )
     if do_sample:
         kwargs.update(temperature=temperature, top_p=top_p)
-    with torch.no_grad():
-        out = model.generate(**kwargs)
+
+    def _gen():
+        with torch.no_grad():
+            return model.generate(**kwargs)
+
+    try:
+        out = _gen()
+    except RuntimeError as exc:
+        # WSL2/笔记本 GPU 上偶发瞬时 CUBLAS 错误：清缓存后重试一次
+        if "CUDA error" not in str(exc):
+            raise
+        torch.cuda.empty_cache()
+        out = _gen()
     new_tokens = out[0][prompt_ids.shape[1]:]
     return {
         "text": tokenizer.decode(new_tokens, skip_special_tokens=True),
         "input_tokens": int(prompt_ids.shape[1]),
+        "output_tokens": int(new_tokens.shape[0]),
+    }
+
+
+def generate_from_text(model, tokenizer, text: str, max_new_tokens: int = 64,
+                       do_sample: bool = False, temperature: float = 1.0,
+                       top_p: float = 1.0, device: str = "cuda") -> Dict[str, Any]:
+    """对已渲染好的完整 prompt 文本生成（Qwen3Guard 官方模板路径：
+    apply_chat_template 已内含 assistant 头与 <think> 预填充，不能再加 generation prompt）。"""
+    import torch
+
+    inputs = tokenizer(text, return_tensors="pt",
+                       add_special_tokens=False).to(device)
+    attention_mask = inputs.get("attention_mask")
+    if attention_mask is None:
+        attention_mask = torch.ones_like(inputs["input_ids"])
+    kwargs = dict(
+        input_ids=inputs["input_ids"],
+        attention_mask=attention_mask,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+    )
+    if do_sample:
+        kwargs.update(temperature=temperature, top_p=top_p)
+
+    def _gen():
+        with torch.no_grad():
+            return model.generate(**kwargs)
+
+    try:
+        out = _gen()
+    except RuntimeError as exc:
+        if "CUDA error" not in str(exc):
+            raise
+        torch.cuda.empty_cache()
+        out = _gen()
+    new_tokens = out[0][inputs["input_ids"].shape[1]:]
+    return {
+        "text": tokenizer.decode(new_tokens, skip_special_tokens=True),
+        "input_tokens": int(inputs["input_ids"].shape[1]),
         "output_tokens": int(new_tokens.shape[0]),
     }
 

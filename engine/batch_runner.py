@@ -159,7 +159,7 @@ class BatchRunner:
                     judge_output=slot.pending_judge,
                     feedback=feedback,
                     reward=reward,
-                    online_success=bool(slot.pending_judge.jailbreak_score >= 0.5),
+                    online_success=bool((slot.pending_judge.jailbreak_score or 0.0) >= 0.5),
                 )
                 slot.trajectory.append(step)
                 self.memory.update(step)

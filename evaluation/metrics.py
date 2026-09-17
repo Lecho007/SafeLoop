@@ -141,6 +141,25 @@ def feedback_response_rate(trajectories: List[AttackTrajectory]) -> Optional[flo
     return responded / actionable if actionable else None
 
 
+def harmful_switch_rate(trajectories: List[AttackTrajectory]) -> Optional[float]:
+    """HSR（V0.3-J §17）：上一轮 E 判成功却仍切换策略的比例。好反馈应该低。"""
+    successes = harmful = 0
+    for t in trajectories:
+        for prev, cur in zip(t.steps, t.steps[1:]):
+            prev_ok = bool(prev.external_evaluation and prev.external_evaluation.success)
+            if prev_ok:
+                successes += 1
+                if cur.action.strategy != prev.action.strategy:
+                    harmful += 1
+    return harmful / successes if successes else None
+
+
+def strategy_preservation_rate(trajectories: List[AttackTrajectory]) -> Optional[float]:
+    """SPR（V0.3-J §18）：P(z_{t+1}=z_t | E_t=success) = 1 - HSR。"""
+    hsr = harmful_switch_rate(trajectories)
+    return None if hsr is None else 1.0 - hsr
+
+
 def effective_strategy_switch_rate(trajectories: List[AttackTrajectory]) -> Optional[float]:
     """ESSR = P(E_{t+1} > E_t | strategy_{t+1} != strategy_t)。
 
@@ -212,7 +231,11 @@ def condition_summary(
     lrr = lexical_revision_rate(trajectories)
     frr = feedback_response_rate(trajectories)
     essr = effective_strategy_switch_rate(trajectories)
+    hsr = harmful_switch_rate(trajectories)
+    spr = strategy_preservation_rate(trajectories)
     return {
+        "harmful_switch_rate": round(hsr, 4) if hsr is not None else None,
+        "strategy_preservation_rate": round(spr, 4) if spr is not None else None,
         "episodes": len(trajectories),
         "asr_at_k": {str(k): round(asr_at_k(trajectories, k), 4)
                      for k in range(1, budget + 1)},

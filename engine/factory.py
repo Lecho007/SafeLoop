@@ -14,6 +14,7 @@ from agents.hf_red_agent import HfRedAgent
 from agents.red_agent import TemplateRedAgent
 from agents.safety_judge import RuleBasedJudge
 from agents.qwen_guard_judge import QwenGuardJudge
+from agents.qwen_guard_judge_v2 import Qwen3GuardJudgeV2
 from core.coordinator import BaseCoordinator
 from core.coordinator_impl import HeuristicCoordinator
 from core.protocol import ExperimentProtocol
@@ -82,6 +83,14 @@ def build_judge(cfg: Dict, model_manager: "ModelManager" = None) -> BaseJudge:
     backend = jcfg.get("backend", "rule_based")
     if backend == "rule_based":
         return RuleBasedJudge(rules_path=jcfg.get("rules_path", "prompts/judge/v1.yaml"))
+    if backend == "qwen3guard_v2":
+        return Qwen3GuardJudgeV2(
+            model_path=jcfg["model_path"],
+            model_manager=model_manager,
+            dtype=jcfg.get("dtype", "bfloat16"),
+            device=jcfg.get("device", "cuda"),
+            max_new_tokens=int(jcfg.get("max_new_tokens", 64)),
+        )
     if backend == "qwen3guard":
         return QwenGuardJudge(
             model_path=jcfg["model_path"],
@@ -177,7 +186,12 @@ class RunnerBundle:
         self.judge = build_judge(cfg, self.model_manager)
         self.evaluator = build_evaluator(cfg, self.model_manager)
         self.memory = build_memory(cfg)
-        self.feedback_builder = FeedbackBuilder()
+        # V0.3-J：feedback.builder: v2（证据驱动 KEEP/REFINE/SWITCH/UNCERTAIN）
+        if (cfg.get("feedback", {}) or {}).get("builder") == "v2":
+            from feedback.feedback_builder_v2 import FeedbackBuilderV2
+            self.feedback_builder = FeedbackBuilderV2()
+        else:
+            self.feedback_builder = FeedbackBuilder()
         self.reward_config = RewardConfig(**(cfg.get("reward", {}) or {}))
         self.provenance = collect_provenance(
             config_path, cfg, self.red_agent, self.target, self.judge, self.evaluator,

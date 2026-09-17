@@ -11,7 +11,7 @@ mamba create -n safeLoop python=3.10 -y
 mamba activate safeLoop
 
 # 实测锁定版本（RTX 4060 Laptop / WSL2 / CUDA 可用）
-pip install torch==2.1.0 transformers==4.53.2 peft==0.15.2 accelerate==1.7.0 bitsandbytes==0.45.5 pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install torch==2.1.2 transformers==4.53.2 peft==0.15.2 accelerate==1.7.0 bitsandbytes==0.45.5 pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
 pip install "numpy<2"    # 必需：torch 2.1 按 numpy 1.x 编译，numpy 2.x 会报 _ARRAY_API 错误
 ```
 

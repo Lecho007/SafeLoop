@@ -199,6 +199,8 @@ class Feedback:
     failure_type: Optional[str] = None
     guidance: Optional[str] = None
     feedback_level: str = "structured"
+    # V0.3-J：控制动作 KEEP/REFINE/SWITCH/UNCERTAIN（Judge 只指出方向，不写攻击）
+    adaptation_action: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -211,6 +213,7 @@ class Feedback:
             "failure_type": self.failure_type,
             "guidance": self.guidance,
             "feedback_level": self.feedback_level,
+            "adaptation_action": self.adaptation_action,
             "metadata": self.metadata,
         }
 
@@ -225,6 +228,7 @@ class Feedback:
             failure_type=d.get("failure_type"),
             guidance=d.get("guidance"),
             feedback_level=d.get("feedback_level", "structured"),
+            adaptation_action=d.get("adaptation_action"),
             metadata=d.get("metadata", {}),
         )
 
