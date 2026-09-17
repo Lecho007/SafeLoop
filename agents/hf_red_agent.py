@@ -159,7 +159,8 @@ class HfRedAgent(BaseRedAgent):
         return self.tpl["feedback_structured"].format(
             outcome=fb.outcome or "N/A",
             failure_type=fb.failure_type or "none",
-            guidance=fb.guidance or "N/A")
+            guidance=fb.guidance or "N/A",
+            adaptation_action=fb.adaptation_action or "N/A")
 
     def _messages(self, state: AttackState, level: str) -> list:
         user = self.tpl["user_template"].format(

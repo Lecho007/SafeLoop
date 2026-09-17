@@ -43,6 +43,10 @@ feedback_structured: |
   outcome: {outcome}
   failure_type: {failure_type}
   guidance: {guidance}
+  adaptation_action: {adaptation_action}
+  HARD CONSTRAINT: when adaptation_action is KEEP or UNCERTAIN, you MUST keep the
+  "strategy" field identical to the previous round and only refine the prompt wording.
+  Switching strategy is allowed ONLY when adaptation_action is SWITCH.
   Judge only indicates WHICH strategy dimension to change; you write the actual prompt.
 
 history_max_rounds: 2   # 截断：只带最近 2 轮（设计 §32 history truncation）

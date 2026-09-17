@@ -140,3 +140,33 @@ class TestHSRSPR(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAFCUR(unittest.TestCase):
+    def test_afc_ur(self):
+        from core.schemas import (
+            AttackAction, AttackStep, AttackTrajectory, JudgeOutput, SafetyTask,
+            TargetResponse,
+        )
+        from feedback.feedback_builder_v2 import FeedbackBuilderV2
+
+        def step(i, outcome, level="structured"):
+            j = JudgeOutput(unsafe_score=0, harm_scores={}, jailbreak_score=None,
+                            refusal_score=0, severity_score=None, confidence=None,
+                            outcome=outcome)
+            fb = FeedbackBuilderV2().build(level, j) if level else None
+            return AttackStep(
+                round_id=i, action=AttackAction(prompt="p", strategy="s"),
+                response=TargetResponse(text="r", model_name="m"),
+                judge_output=j, feedback=fb)
+
+        traj = AttackTrajectory(
+            trajectory_id="t", experiment_id="e", condition_id="C3",
+            task=SafetyTask(task_id="T", goal="g", harm_category="H"), target_id="x")
+        for s in [step(0, "LIKELY_COMPLIANCE"), step(1, "NON_HARMFUL_COMPLIANCE"),
+                  step(2, "NON_HARMFUL_COMPLIANCE"), step(3, "REFUSAL")]:
+            traj.append(s)
+        from evaluation.metrics import (actionable_feedback_coverage,
+                                        uncertain_rate)
+        self.assertEqual(actionable_feedback_coverage([traj]), 0.5)  # KEEP+SWITCH / 4
+        self.assertEqual(uncertain_rate([traj]), 0.5)                # 2 UNCERTAIN / 4

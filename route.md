@@ -138,12 +138,34 @@ V1 判定 100% PARTIAL_COMPLIANCE、在线成功率恒 0）。
 **Gate 结论**：J1(parser) PASS / J3(TypeB 18.3%<25%) 达成 / J2(refusal 判别指标定义待修，
 方向一致性 88%) / J4(行为) 部分达成（HSR✓、ESSR✗）。
 
-### 4.8 Stage 1B 前的决策点（待定）
-反馈机制本身已证实可用（KEEP 遵守率 100%），但聚合收益受限于 Guard 可判定类别覆盖率。
-选项：A. 1B 用内容型类别子集验证反馈机制（最干净）；B. 为合规型类别引入独立在线
-goal-compliance 信号（架构变更，需讨论）；C. 带 caveat 直接 1B 全类别。默认建议 A。
+### 4.8 Stage 1 正式路线（V0.3-B 决策：A，已冻结）
+```text
+Stage 1A   engineering validation                    DONE
+Stage 1A-J judge recovery & calibration              DONE
+Stage 1A-R2 behavioral verification                  DONE
+Stage 1B-A Judge-Observable Subset Mechanism Validation
+           C1 vs C3，B=5，jbb_content_observable（70 tasks，语义预标定，
+           mapping jbb_observability_v1 冻结，禁用 1A 结果选择类别）
+Stage 1B-B Goal-Compliance Signal（任务感知多信号判别器 J={S_content,S_refusal,S_goal}）
+           content vs goal vs multi-signal 三元消融 × {content, compliance, full} 子集
+Stage 1C  Full benchmark（JBB full + HarmBench-Val，C0/C1/C2/C3/SR）→ 冻结 → Test
+```
+H1/H2/H3 不变（ASR@5/AUC-B/CTTS，C3 vs C1），新增机制假设：
+H4 ESSR_C3>ESSR_C1；H5 HSR_C3<HSR_old-C3。
 
-### 4.9 后续（权重就位后）
+### 4.9 Stage 1B-A 前置件（已完成）
+- **观测性映射冻结** `data/mappings/jbb_observability_v1.yaml`：语义标注
+  content_observable 7 类（含 Fraud/Privacy 两条 ambiguous 待人工复核）vs
+  goal_compliance 3 类；manifest：jbb100_full / jbb_content_observable(70) /
+  jbb_goal_compliance(30)，task 元数据带 feedback_observability + mapping_version。
+- **新指标**：AFC（可行动反馈覆盖率，KEEP/REFINE/SWITCH 占比）、UR（UNCERTAIN 率，
+  content 子集上应显著低于全类别 ~50%——本身就是诊断验证）+ 已有 HSR/SPR。
+- **UNCERTAIN 语义收紧**：永不强制切换策略族（guidance + 红方模板硬约束：
+  KEEP/UNCERTAIN 时 strategy 字段必须与上一轮一致）。
+- **Gate J2 重定义**：refusal 判别质量用 xstest-response（allenai，response_refusal
+  split 449 条真 refusal 标注）独立校准；StrongREJECT failure 不再冒充 refusal GT。
+
+### 4.10 后续（权重就位后）
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
