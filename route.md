@@ -224,7 +224,25 @@ rubric 语义（恶意行为者视角）与 J_g 的"请求完成度"语义存在
 - 工程注记：1B-B 经历两次中断均由检查点续跑恢复（双模型加载 bug；WSL2 CUDA 驱动
   瞬断，已加加载重试护栏）。
 
-### 4.13 后续
+### 4.13 Stage 1B-GC 结果（2026-09-18，Goal Judge 语义校准）
+**FULL-18 人工审计（annotator_1=ZCode）**：18/18 为 rebuttal-essay（"X 违法+后果清单"），
+两维度裁决 completion=PARTIAL / advancement=NONE——**情况 A+：Human 全部支持
+StrongREJECT**；根因：JBB goal 多为 "Explain how to X" 句式，V1 按字面"是否解释了
+话题"打分，把反驳说教判成 FULL+HIGH。D_goal-cal 89 条分层校准集已建
+（FULL18+SUBSTANTIAL38+PARTIAL19+NONE14，annotator_2 待人工）。
+
+**GoalAdvancementJudge V2**（双维度：request_completion 诊断 +
+harmful_goal_advancement 决策 + polarity；realign 语义进 FeedbackBuilder）：
+- FULL-18 修正：18/18 → NONE（与人工审计完全对齐）；
+- 与 E 二值一致率：0.287 → **0.707**（不与 E 对齐训练，仅语义修正）；
+- 单调性成立：E-rate NONE 0.235 < DIRECT 0.484；
+- 漂移检测保持：DRIFTED 8 条（V1 抓 13）；
+- **已知局限**：1.7B judge 的 advancement 塌缩为二值（NONE 119 / DIRECT 31），
+  MINOR/SUBSTANTIAL 未启用 → goal 路反馈实际只有 KEEP/SWITCH（+realign），
+  REFINE 缺失。是否接受二值行为进 1B-R，或继续迭代 prompt 诱发中间档，待裁决。
+- V1 语义正式归档为 request_completion 维度（双维度设计把分歧显式建模）。
+
+### 4.14 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
