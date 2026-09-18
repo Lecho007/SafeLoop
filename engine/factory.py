@@ -15,6 +15,8 @@ from agents.red_agent import TemplateRedAgent
 from agents.safety_judge import RuleBasedJudge
 from agents.qwen_guard_judge import QwenGuardJudge
 from agents.qwen_guard_judge_v2 import Qwen3GuardJudgeV2
+from agents.goal_compliance_judge import GoalComplianceJudge
+from agents.multi_signal_judge import MultiSignalJudge
 from core.coordinator import BaseCoordinator
 from core.coordinator_impl import HeuristicCoordinator
 from core.protocol import ExperimentProtocol
@@ -91,6 +93,32 @@ def build_judge(cfg: Dict, model_manager: "ModelManager" = None) -> BaseJudge:
             device=jcfg.get("device", "cuda"),
             max_new_tokens=int(jcfg.get("max_new_tokens", 64)),
         )
+    if backend == "goal_compliance":
+        return GoalComplianceJudge(
+            model_path=jcfg["model_path"],
+            model_manager=model_manager,
+            dtype=jcfg.get("dtype", "bfloat16"),
+            device=jcfg.get("device", "cuda"),
+            max_new_tokens=int(jcfg.get("max_new_tokens", 48)),
+        )
+    if backend == "multi_signal":
+        mcfg = jcfg.get("content_judge", {}) or {}
+        gcfg = jcfg.get("goal_judge", {}) or {}
+        content = Qwen3GuardJudgeV2(
+            model_path=mcfg.get("model_path", mcfg.get("model_path")),
+            model_manager=model_manager,
+            dtype=mcfg.get("dtype", "bfloat16"),
+            device=mcfg.get("device", "cuda"),
+            max_new_tokens=int(mcfg.get("max_new_tokens", 64)),
+        )
+        goal = GoalComplianceJudge(
+            model_path=gcfg["model_path"],
+            model_manager=model_manager,
+            dtype=gcfg.get("dtype", "bfloat16"),
+            device=gcfg.get("device", "cuda"),
+            max_new_tokens=int(gcfg.get("max_new_tokens", 48)),
+        )
+        return MultiSignalJudge(content, goal)
     if backend == "qwen3guard":
         return QwenGuardJudge(
             model_path=jcfg["model_path"],

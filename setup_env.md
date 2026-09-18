@@ -162,6 +162,13 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True nohup $PY scripts/run_stage1a.p
 # 中断后（断电/崩溃/手动停止）加 --resume 从最近完成轮次继续：
 #   $PY scripts/run_stage1a.py --config configs/hardware/rtx4060_8g_1ba.yaml --resume
 
+# Stage 1B-B（任务感知多信号判别器：30 goal-compliance × B0/B-C/B-G/B-M × B=5）
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True PYTHONPATH=. nohup $PY -c \
+    "from experiments.stage1bb import main; main()" > outputs/logs/stage1b_b.log 2>&1 &
+
+# 1B-A 归档统计（Wilson CI/bootstrap/EAR/风险率/FRR 分解）
+PYTHONPATH=. python3 scripts/archive_1ba_stats.py
+
 # Gate J2 refusal 校准（xstest-response 449 条真标注）
 PYTHONPATH=. $PY scripts/calibrate_refusal.py            # GPU；主实验运行中用 --device cpu --dtype float32
 

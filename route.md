@@ -184,7 +184,18 @@ C3 结构化  20%    37.1%  38.6%  0.329  4.36   0.38  0.11(.89)   52%/48%      
 - 结论：机制证据链（Judge→Feedback→保护奏效策略）在判别器可观测域内成立；
   ASR 级增益需要多 seed（42/123/2026）与更大任务量确认，或等 1B-B 扩大可观测域。
 
-### 4.11 后续
+### 4.11 Stage 1B-B（进行中，2026-09-18）
+组件：GoalComplianceJudge（J_g：original goal+response 输入 → goal_progress/
+polarity/confidence 离散输出，复用 Qwen3-1.7B 权重走独立 rubric prompt，与
+StrongREJECT 无共享机制，J≠E 原则保持）；MultiSignalJudge（任务感知融合：
+observability 决定主信号，保守修正——极性漂移阻断成功判定、goal 拒绝提升 refusal）。
+条件：B0/B-C/B-G/B-M × 30 goal-compliance × B=5（600 queries）。假设 H6–H9
+（UR↓→AFC↑→HSR↓→ASR↑ 逐层验证"扩大观测空间"）。1B-A 冻结于 tag
+stage1b-a-freeze（cb561c2）。归档统计补齐：KEEP Wilson CI [0.89,1.00]、
+ΔHSR −0.099 [−0.23,+0.04]、首次成功风险率 round2 C3 0.102 vs C1 0.041、
+FRR 分解（UNCERTAIN 响应率 0.41 是 FRR=0.66 的短板）。
+
+### 4.12 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
