@@ -43,6 +43,22 @@ def _device_index(device: str) -> int:
     raise ValueError("量化加载需要 GPU 设备，当前 device={}".format(device))
 
 
+def _with_cuda_retry(loader, attempts: int = 3, wait_s: int = 30):
+    """WSL2 上偶发 'CUDA driver error: device not ready'（驱动级瞬断）：
+    加载类操作失败时等待后重试。"""
+    import time
+    last = None
+    for i in range(attempts):
+        try:
+            return loader()
+        except RuntimeError as exc:
+            if "CUDA" not in str(exc) and "driver" not in str(exc):
+                raise
+            last = exc
+            time.sleep(wait_s)
+    raise last
+
+
 def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda",
                    quantization: Optional[dict] = None):
     """加载因果 LM + tokenizer（懒导入 transformers）。
@@ -53,10 +69,11 @@ def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda"
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=False)
+    tokenizer = _with_cuda_retry(lambda: tokenizer)
     if quantization:
         from transformers import BitsAndBytesConfig
         spec = dict(quantization)
-        model = AutoModelForCausalLM.from_pretrained(
+        model = _with_cuda_retry(lambda: AutoModelForCausalLM.from_pretrained(
             model_path,
             quantization_config=BitsAndBytesConfig(
                 load_in_4bit=True,
@@ -66,14 +83,14 @@ def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda"
             ),
             device_map={"": _device_index(device)},
             attn_implementation="sdpa",   # 避免 eager 大矩阵 matmul（CUBLAS 崩溃根因）
-        )
+        ))
     else:
-        model = AutoModelForCausalLM.from_pretrained(
+        model = _with_cuda_retry(lambda: AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=resolve_dtype(dtype),
             device_map=None,
             attn_implementation="sdpa",
-        )
+        ))
         model.to(device)
     model.eval()
     return model, tokenizer
