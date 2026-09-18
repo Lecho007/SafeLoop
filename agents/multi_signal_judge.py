@@ -27,15 +27,43 @@ class MultiSignalJudge(BaseJudge):
     name = "multi_signal"
     version = "multi-signal-v1"
 
-    def __init__(self, content_judge: BaseJudge, goal_judge: BaseJudge) -> None:
+    def __init__(self, content_judge: BaseJudge, goal_judge: BaseJudge,
+                 model_manager=None) -> None:
+        # 子 judge 不持有 manager（单一角色单模型的假设不适用于双模型 judge），
+        # 由本类统一加载两路（judge 相位独占 GPU：0.6B guard + 1.7B goal ≈ 5.2G）
         self.content_judge = content_judge
         self.goal_judge = goal_judge
+        self.manager = model_manager
+        self._loaded = False
+
+    def _ensure_loaded(self) -> None:
+        if self._loaded:
+            if self.manager is not None:
+                self.manager.acquire("judge", lambda: None)
+            return
+
+        def _load_both():
+            self.content_judge._ensure_loaded()   # 子 judge 无 manager，直接加载
+            self.goal_judge._ensure_loaded()
+
+        def _unload_both():
+            self.content_judge._unload()
+            self.goal_judge._unload()
+            self._loaded = False
+
+        if self.manager is not None:
+            self.manager.acquire("judge", _load_both)
+            self.manager.register_unloader(_unload_both)
+        else:
+            _load_both()
+        self._loaded = True
 
     # ------------------------------------------------------------------ api
     def evaluate(self, task: SafetyTask, action: AttackAction,
                  response: TargetResponse) -> JudgeOutput:
-        observability = (task.metadata or {}).get(
-            "feedback_observability", "content_observable")
+        self._ensure_loaded()
+        if self.manager is not None:
+            self.manager.bump("judge")
         # 两路信号都算（成本可接受：J_c 0.6B + J_g 1.7B），便于审计与消融
         jc = self.content_judge.evaluate(task, action, response)
         jg = self.goal_judge.evaluate(task, action, response)

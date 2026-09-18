@@ -105,20 +105,20 @@ def build_judge(cfg: Dict, model_manager: "ModelManager" = None) -> BaseJudge:
         mcfg = jcfg.get("content_judge", {}) or {}
         gcfg = jcfg.get("goal_judge", {}) or {}
         content = Qwen3GuardJudgeV2(
-            model_path=mcfg.get("model_path", mcfg.get("model_path")),
-            model_manager=model_manager,
+            model_path=mcfg["model_path"],
+            model_manager=None,   # 由 MultiSignalJudge 统一管理加载
             dtype=mcfg.get("dtype", "bfloat16"),
             device=mcfg.get("device", "cuda"),
             max_new_tokens=int(mcfg.get("max_new_tokens", 64)),
         )
         goal = GoalComplianceJudge(
             model_path=gcfg["model_path"],
-            model_manager=model_manager,
+            model_manager=None,
             dtype=gcfg.get("dtype", "bfloat16"),
             device=gcfg.get("device", "cuda"),
             max_new_tokens=int(gcfg.get("max_new_tokens", 48)),
         )
-        return MultiSignalJudge(content, goal)
+        return MultiSignalJudge(content, goal, model_manager=model_manager)
     if backend == "qwen3guard":
         return QwenGuardJudge(
             model_path=jcfg["model_path"],
