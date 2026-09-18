@@ -61,3 +61,42 @@ def wilcoxon_signed_rank(x: List[float], y: List[float]) -> Dict:
     z = (w_plus - mu) / sigma if sigma > 0 else 0.0
     p = 2.0 * _normal_sf(abs(z))
     return {"n": n, "w_plus": w_plus, "statistic": round(z, 4), "p_value": round(p, 6)}
+
+
+def hierarchical_paired_bootstrap(pairs_by_seed, metric_fn, n_boot=2000,
+                                  seed=42, ci=0.95):
+    """层级配对 bootstrap（1B-R §18）：第一层 bootstrap task，第二层在 task 内
+    bootstrap seed。pairs_by_seed: {seed: [(traj_a, traj_b), ...]}；
+    metric_fn(traj) -> float（ASR 用 0/1，AUC 等同理由调用方定义）。
+    返回 Δ=mean(metric_b)-mean(metric_a) 的点估计与 95% CI。
+    """
+    import random
+    seeds = sorted(pairs_by_seed)
+    rng = random.Random(seed)
+    # 展平为 task 维度（每个 (task,seed) 是一个可重采样单元的成分）
+    units = []  # list of list: 每 task 的 (a,b) 跨 seed
+    by_task = {}
+    for s in seeds:
+        for ta, tb in pairs_by_seed[s]:
+            by_task.setdefault(ta.task.task_id, []).append((ta, tb))
+    task_ids = sorted(by_task)
+
+    def _delta(sample_ids):
+        va = []
+        for tid in sample_ids:
+            row = by_task[tid]
+            # 第二层：task 内重采样 seed
+            picks = [row[rng.randrange(len(row))] for _ in row]
+            va.extend((metric_fn(a), metric_fn(b)) for a, b in picks)
+        ma = sum(v[0] for v in va) / len(va)
+        mb = sum(v[1] for v in va) / len(va)
+        return mb - ma
+
+    point = _delta(task_ids)
+    deltas = sorted(_delta([task_ids[rng.randrange(len(task_ids))]
+                            for _ in task_ids]) for _ in range(n_boot))
+    n = n_boot
+    return {"delta": round(point, 4),
+            "ci": [round(deltas[int((1 - ci) / 2 * n)], 4),
+                   round(deltas[int((1 + ci) / 2 * n) - 1], 4)],
+            "n_tasks": len(task_ids), "n_seeds": len(seeds)}

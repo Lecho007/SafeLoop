@@ -50,6 +50,9 @@ def _judge_cfg_for(cfg: Dict, backend: str) -> Dict:
                                         "dtype": cfg.get("goal_judge", {}).get(
                                             "dtype", jcfg.get("dtype", "bfloat16")),
                                         "device": jcfg.get("device", "cuda")}}
+    elif backend == "goal_compliance":
+        # J_g 必须用 goal_judge 段的模型（B_G 条件曾误用 content 路径——已修复）
+        base["judge"] = dict(jcfg, backend=backend, model_path=goal_path)
     else:
         base["judge"] = dict(jcfg, backend=backend)
     return base
