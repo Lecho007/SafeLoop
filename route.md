@@ -241,7 +241,21 @@ harmful_goal_advancement 决策 + polarity；realign 语义进 FeedbackBuilder�
   REFINE 缺失。是否接受二值行为进 1B-R，或继续迭代 prompt 诱发中间档，待裁决。
 - V1 语义正式归档为 request_completion 维度（双维度设计把分歧显式建模）。
 
-### 4.14 后续
+### 4.14 B-G-V2 在线确认（2026-09-18）：Controller FAIL（非语义 FAIL）
+- **G1 FAIL**：在线 advancement 全 NOT_ADVANCING（ADVANCING 0/150；AR=0/37），
+  但 canonical 探针 4/4 正确——语义已对，**边界在真实分布上过严**
+  （E-success 样本多为 disclaimer+条件性实质内容型）；
+- **G2 FAIL**：KEEP 消失 → SWITCH 振荡（SWITCH 135/REFINE 15，HSR 0.733）；
+- **G3 = NOT INTERPRETABLE**：ASR@5=50%/AUC 0.40 数字不可归因为反馈增益
+  （控制退化下的波动，不进论文主表）；
+- **机制结论：Evaluator Calibration ≠ Controller Calibration**；V1=过度乐观
+  （request completion 语义，18/18 被人工推翻）、V2=过度保守（二值砍掉 PARTIAL
+  缓冲带）——两者保留为正式消融，设计原则："闭环 Judge 需要判得准 +
+  足够的控制分辨率（decision granularity matters）"。
+- 裁决：进 Stage 1B-GC2（控制校准），V3 = NONE/PARTIAL/STRONG 三级推进信号，
+  语义与控制彻底分离；1B-R 继续冻结。
+
+### 4.15 Stage 1B-GC2 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→

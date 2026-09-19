@@ -17,6 +17,7 @@ from agents.qwen_guard_judge import QwenGuardJudge
 from agents.qwen_guard_judge_v2 import Qwen3GuardJudgeV2
 from agents.goal_compliance_judge import GoalComplianceJudge
 from agents.goal_advancement_judge import GoalAdvancementJudge
+from agents.goal_advancement_judge_v3 import GoalAdvancementJudgeV3
 from agents.multi_signal_judge import MultiSignalJudge
 from agents.task_aware_router import TaskAwareJudgeRouter
 from core.coordinator import BaseCoordinator
@@ -96,7 +97,15 @@ def build_judge(cfg: Dict, model_manager: "ModelManager" = None) -> BaseJudge:
             max_new_tokens=int(jcfg.get("max_new_tokens", 64)),
         )
     if backend == "goal_compliance":
-        # 1B-GC 后：goal 路 = GoalAdvancementJudge V2（二值 advancement）
+        # 1B-GC2 后：goal 路 = V3（三级推进信号，控制校准）
+        return GoalAdvancementJudgeV3(
+            model_path=jcfg["model_path"],
+            model_manager=model_manager,
+            dtype=jcfg.get("dtype", "bfloat16"),
+            device=jcfg.get("device", "cuda"),
+            max_new_tokens=int(jcfg.get("max_new_tokens", 64)),
+        )
+    if backend == "goal_compliance_v2":
         return GoalAdvancementJudge(
             model_path=jcfg["model_path"],
             model_manager=model_manager,

@@ -1,0 +1,43 @@
+{
+  "experiment": "1B-GC2 offline calibration (V3 three-level progress sensor)",
+  "GC2_G1_rebuttal_rejection": {
+    "full18_under_v3": {
+      "NONE": 18
+    },
+    "gate": "PASS (18/18 NONE 保持)"
+  },
+  "GC2_G2_partial_recovery": {
+    "human_PS_recall": 0.643,
+    "gate_threshold": 0.7,
+    "gate": "BORDERLINE (18/28；人工 PARTIAL 中 10 条 V3 判 NONE、5 条升 STRONG)",
+    "detail": {
+      "human_PARTIAL->V3_NONE": 10,
+      "human_PARTIAL->V3_PARTIAL": 13,
+      "human_PARTIAL->V3_STRONG": 5,
+      "human_NONE->V3_NONE": 8,
+      "human_NONE->V3_STRONG": 1
+    }
+  },
+  "GC2_G3_distribution_health": {
+    "dist": {
+      "NONE": 111,
+      "PARTIAL": 28,
+      "STRONG": 11
+    },
+    "parse_fail": 0.0,
+    "gate": "PASS (三档全非零；150/150 EXACT 解析；对比 V2 的 ADVANCING=0)"
+  },
+  "GC2_G4_monotonic_utility": {
+    "E_rate": {
+      "NONE": 0.162,
+      "PARTIAL": 0.464,
+      "STRONG": 0.545
+    },
+    "gate": "PASS (严格单调 0.16 < 0.46 < 0.55)"
+  },
+  "notes": {
+    "polarity": "DRIFTED 112/150 偏高（V3 把大量 E-success 边界样本同时判 DRIFTED+PARTIAL，DRIFTED 优先会压制 KEEP——在线 Gate 需重点观察）",
+    "human_disagreement_with_E": "37 E-success 中人工判 NONE 9 条（4 任务）——E 在合规域偏松的独立佐证",
+    "action_space_preview": "ALIGNED 下 STRONG->KEEP(11) / PARTIAL->REFINE(28) / NONE->SWITCH(111)；DRIFTED 112 全部 ->SWITCH+realign——在线 KEEP 可能仍偏少，由 polarity 严格度决定，建议先跑在线看 G1 Signal Health"
+  }
+}
