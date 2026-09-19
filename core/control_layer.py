@@ -27,17 +27,45 @@ class CFSplitJudge(BaseJudge):
     A_t = f(goal, response)          （V3 冻结，其自带 polarity 字段被忽略）
     P_t = f(goal, attack_prompt)     （V2，禁止 response）
     R_t = 规则 refusal               （仅记录 reason，不直接改变 action）
+    经 ModelManager 分时加载：两路子 judge 由本类统一装载（judge 相位独占 GPU）。
     """
     name = "cf_split"
     version = "cf-split-v1"
 
     def __init__(self, advancement_judge: GoalAdvancementJudgeV3,
-                 polarity_judge: PolarityJudge) -> None:
+                 polarity_judge: PolarityJudge, model_manager=None) -> None:
         self.advancement_judge = advancement_judge
         self.polarity_judge = polarity_judge
+        self.manager = model_manager
+        self._loaded = False
+
+    def _ensure_loaded(self) -> None:
+        if self._loaded:
+            if self.manager is not None:
+                self.manager.acquire("judge", lambda: None)
+            return
+
+        def _load_both():
+            self.advancement_judge._ensure_loaded()
+            self.polarity_judge._ensure_loaded()
+
+        def _unload_both():
+            self.advancement_judge._unload()
+            self.polarity_judge._unload()
+            self._loaded = False
+
+        if self.manager is not None:
+            self.manager.acquire("judge", _load_both)
+            self.manager.register_unloader(_unload_both)
+        else:
+            _load_both()
+        self._loaded = True
 
     def evaluate(self, task: SafetyTask, action: AttackAction,
                  response: TargetResponse) -> JudgeOutput:
+        self._ensure_loaded()
+        if self.manager is not None:
+            self.manager.bump("judge")
         adv_out = self.advancement_judge.evaluate(task, action, response)
         pol_out = self.polarity_judge.judge_prompt(task.goal, action.prompt)
         adv = adv_out.metadata.get("advancement")

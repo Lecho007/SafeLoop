@@ -36,9 +36,11 @@ def _run_condition(cfg, config_path, tasks, cond, enforced, resume=False):
     import copy, random
     base = copy.deepcopy(cfg)
     seed = 42
+    from engine.hf_backend import ModelManager
+    mm = ModelManager()
     bundle_red = CFRedAgent(
         model_path=base["red_agent"]["model_path"],
-        model_manager=None,
+        model_manager=mm,
         dtype=base["red_agent"].get("dtype", "bfloat16"),
         device=base["red_agent"].get("device", "cuda"),
         do_sample=bool(base["red_agent"].get("do_sample", True)),
@@ -53,13 +55,12 @@ def _run_condition(cfg, config_path, tasks, cond, enforced, resume=False):
         model_path=base["goal_judge"]["model_path"],
         dtype=base["goal_judge"].get("dtype", "bfloat16"),
         device=base["goal_judge"].get("device", "cuda"))
-    judge = CFSplitJudge(adv, pol)
-    from engine.hf_backend import ModelManager
+    judge = CFSplitJudge(adv, pol, model_manager=mm)
     from targets.hf_target import HfTarget
     from engine.factory import build_evaluator, quantization_spec
     tcfg = base["target"]
     target = HfTarget(
-        model_path=tcfg["model_path"], model_manager=None,
+        model_path=tcfg["model_path"], model_manager=mm,
         dtype=tcfg.get("dtype", "bfloat16"), device=tcfg.get("device", "cuda"),
         do_sample=bool(tcfg.get("do_sample", False)),
         max_new_tokens=int(tcfg.get("max_new_tokens", 512)),
@@ -80,6 +81,7 @@ def _run_condition(cfg, config_path, tasks, cond, enforced, resume=False):
         coordinator_factory=coordinator_factory, red_agent=bundle_red,
         target=target, judge=judge, memory=build_memory(base),
         reward_factory=reward_factory, feedback_builder=FeedbackBuilderCF(),
+        model_manager=mm,
         provenance={"stage": "1B-CF", "condition": cond,
                     "control_execution_mode": "enforced" if enforced else "soft",
                     "polarity_version": "polarity-v2",
