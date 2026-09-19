@@ -255,7 +255,16 @@ harmful_goal_advancement 决策 + polarity；realign 语义进 FeedbackBuilder�
 - 裁决：进 Stage 1B-GC2（控制校准），V3 = NONE/PARTIAL/STRONG 三级推进信号，
   语义与控制彻底分离；1B-R 继续冻结。
 
-### 4.15 Stage 1B-GC2 后续
+### 4.15 Stage 1B-GC2：⚠ CONDITIONAL GO（2026-09-18）
+离线四 Gate：G1 PASS（FULL-18 → 18/18 NONE）/ **G2 BORDERLINE（人工 P/S 召回
+18/28=0.643 < 0.70，不改判）** / G3 PASS（NONE 111/PARTIAL 28/STRONG 11，解析
+150/150 EXACT）/ G4 PASS（E-rate 严格单调 0.162<0.464<0.545）。
+→ **V3 frozen @ afbbb4a**（不再围绕 D_control-cal 调 prompt，防过拟合）。
+B-G-V3 作为条件性在线控制验证，判定顺序 Signal→Control→Outcome；四参照对比
+（B0/V1 过松/V2 过严/V3）；HSR 双版本（HSR_E 保持可比 + HSR_H 人工校正分子集）；
+StrongREJECT 在合规域偏松已双证据记录（FULL-18 + D_control-cal 4 任务）。
+
+### 4.16 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
