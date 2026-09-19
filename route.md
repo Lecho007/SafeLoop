@@ -1,8 +1,7 @@
 # SafeLoop：基于判别反馈与协同进化的大语言模型闭环安全评估框架
 # SafeLoop: A Judge-Guided Co-Evolutionary Red Teaming Framework for Large Language Model Safety Evaluation
 
-# SafeLoop 路线文档
-
+# SafeLo
 > 原项目（paper/，Legacy V0：DeepSeek-R1 红方 + MacBERT 15 类判别 + Flask/Vue 平台）不再修补。
 > 按模型无关、闭环驱动、轨迹级、可逐步训练的架构重新组织，分 Stage 推进。
 > 冻结原则（V0.3 起）：core/ 与 engine/episode_runner.py 不再改动，
