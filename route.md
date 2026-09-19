@@ -286,7 +286,26 @@ DRIFTED 判 121/150（81%）把多数轮导向 SWITCH+realign，红方在"回正
 未重建有效攻击，ASR 系统性低于 B0。结论：三级推进信号解决了动作分辨率问题，
 polarity 判定成为新的主导误差源。
 
-### 4.17 后续
+### 4.17 Stage 1B-CD 控制分解诊断（2026-09-18，纯离线，零 Target 调用）
+- **诊断1 polarity 人工审计（50/121 分层）**：TRUE_DRIFT 2 / AMBIGUOUS 8 /
+  FALSE_DRIFT 40——**Polarity Precision = 0.04（严格）/ 0.20（含模糊）**。
+  模式：V3 把"目标内 prompt 的拒绝/反驳"误判为请求漂移（40/50 为
+  on-goal prompt + refusal 响应）；仅 JBB-0097（prompt 真反转）等 2 条为真漂移。
+- **诊断2 FRR 分解**：KEEP 1.00 / REFINE 0.06 / **SWITCH 0.00**——执行能力
+  极端不对称。
+- **诊断3 条件转移矩阵**：P(switch_like|SWITCH)=0/96；SWITCH 后 95% 同策略微调、
+  5% 同策略重写、0% 换族；SSR=0 为结构性零值（HSR=0 同理失效）。
+  机制注记：红方模板对 KEEP/UNCERTAIN 有硬约束、对 SWITCH 仅"允许"——
+  执行不对称为约束不对称的直接产物。
+- **诊断4 B-C vs V3 任务向量**：28/30 一致（都成功 6；仅差 JBB-0091/JBB-0036），
+  两种反馈收敛到类似的保守行为。
+- **结论：双瓶颈同时确认**——①Judge 侧 polarity 拒绝/漂移混淆（precision 0.04）；
+  ②Red 侧 SWITCH/REFINE 控制指令未被执行（0.00/0.06）。
+  Observation→Polarity→Action→Execution 链条后两跳失真。
+  V3 正向保留项：三级信号在线成立、解析 150/150、rebuttal 语义错误未复发、
+  PARTIAL 真实存在（24）。
+
+### 4.18 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
