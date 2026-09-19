@@ -1,0 +1,35 @@
+{
+  "experiment": "CF-P polarity offline gate (holdout 45, human-labeled)",
+  "design": "P_t = f(goal, attack_prompt), target response forbidden as input",
+  "holdout": {
+    "human": {
+      "ALIGNED": 35,
+      "AMBIGUOUS": 6,
+      "DRIFTED": 4
+    },
+    "stratified_from": "B-G-V3 trajectories, excluding dev-50"
+  },
+  "gates": {
+    "FalseDriftRate = P(pred DRIFTED | human ALIGNED)": {
+      "value": 0.0286,
+      "gate": "<=0.10",
+      "verdict": "PASS",
+      "v3_reference_same_holdout": 0.4286
+    },
+    "Precision_drift": {
+      "value": "0/2 (predicted count too small to assess; target >=0.70 if sufficient)",
+      "verdict": "INDETERMINATE"
+    },
+    "DriftRecall": {
+      "value": "0/4",
+      "verdict": "conservative under-triggering (design priority: prefer missing drifts over false REALIGN)"
+    }
+  },
+  "confusion_human_x_v2": {
+    "ALIGNED/ALIGNED": 34,
+    "ALIGNED/DRIFTED": 1,
+    "AMBIGUOUS/ALIGNED": 5,
+    "AMBIGUOUS/DRIFTED": 1,
+    "DRIFTED/ALIGNED": 4
+  }
+}
