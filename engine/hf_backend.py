@@ -85,13 +85,16 @@ def load_causal_lm(model_path: str, dtype: str = "float16", device: str = "cuda"
             attn_implementation="sdpa",   # 避免 eager 大矩阵 matmul（CUBLAS 崩溃根因）
         ))
     else:
-        model = _with_cuda_retry(lambda: AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=resolve_dtype(dtype),
-            device_map=None,
-            attn_implementation="sdpa",
-        ))
-        model.to(device)
+        def _load_plain():
+            m = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=resolve_dtype(dtype),
+                device_map=None,
+                attn_implementation="sdpa",
+            )
+            m.to(device)   # to() 必须在 retry 作用域内（驱动瞬断高发点）
+            return m
+        model = _with_cuda_retry(_load_plain)
     model.eval()
     return model, tokenizer
 
