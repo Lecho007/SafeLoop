@@ -43,19 +43,30 @@ def _device_index(device: str) -> int:
     raise ValueError("量化加载需要 GPU 设备，当前 device={}".format(device))
 
 
-def _with_cuda_retry(loader, attempts: int = 3, wait_s: int = 30):
-    """WSL2 上偶发 'CUDA driver error: device not ready'（驱动级瞬断）：
-    加载类操作失败时等待后重试。"""
+def _with_cuda_retry(loader, attempts: int = 5, wait_s: int = 90):
+    """WSL2 驱动瞬断重试（device not ready / allocator INTERNAL ASSERT 等）：
+    递增退避 + 清理 GPU 缓存；加载失败可安全重试（幂等）。"""
+    import gc
     import time
     last = None
     for i in range(attempts):
         try:
             return loader()
-        except RuntimeError as exc:
-            if "CUDA" not in str(exc) and "driver" not in str(exc):
+        except Exception as exc:  # noqa: BLE001 驱动/分配器类瞬时错误广捕获
+            msg = str(exc)
+            transient = ("CUDA" in msg or "driver" in msg
+                         or "INTERNAL ASSERT" in msg or "device not ready" in msg)
+            if not transient:
                 raise
             last = exc
-            time.sleep(wait_s)
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
+            gc.collect()
+            time.sleep(wait_s + i * 60)
     raise last
 
 
