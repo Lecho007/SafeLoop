@@ -47,11 +47,20 @@ class CFSplitJudge(BaseJudge):
 
         def _load_both():
             self.advancement_judge._ensure_loaded()
-            self.polarity_judge._ensure_loaded()
+            # 同权重路径的两路 judge 共享单实例（否则 2×3.8G 同时驻留触顶 8G，
+            # 触发 CUDACachingAllocator INTERNAL ASSERT）
+            if (self.polarity_judge.model_path == self.advancement_judge.model_path
+                    and self.advancement_judge._model is not None):
+                self.polarity_judge._model = self.advancement_judge._model
+                self.polarity_judge._tokenizer = self.advancement_judge._tokenizer
+            else:
+                self.polarity_judge._ensure_loaded()
 
         def _unload_both():
+            # 共享实例只卸载一次
             self.advancement_judge._unload()
-            self.polarity_judge._unload()
+            self.polarity_judge._model = None
+            self.polarity_judge._tokenizer = None
             self._loaded = False
 
         if self.manager is not None:
