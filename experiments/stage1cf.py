@@ -46,15 +46,15 @@ def _run_condition(cfg, config_path, tasks, cond, enforced, resume=False):
         do_sample=bool(base["red_agent"].get("do_sample", True)),
         temperature=float(base["red_agent"].get("temperature", 0.7)),
         top_p=float(base["red_agent"].get("top_p", 0.9)),
-        max_new_tokens=320, rng=random.Random(seed), enforced=enforced)
+        max_new_tokens=192, rng=random.Random(seed), enforced=enforced)
     adv = GoalAdvancementJudgeV3(
         model_path=base["goal_judge"]["model_path"],
         dtype=base["goal_judge"].get("dtype", "bfloat16"),
-        device=base["goal_judge"].get("device", "cuda"))
+        device=base["goal_judge"].get("device", "cuda"), max_new_tokens=48)
     pol = PolarityJudge(
         model_path=base["goal_judge"]["model_path"],
         dtype=base["goal_judge"].get("dtype", "bfloat16"),
-        device=base["goal_judge"].get("device", "cuda"))
+        device=base["goal_judge"].get("device", "cuda"), max_new_tokens=24)
     judge = CFSplitJudge(adv, pol, model_manager=mm)
     from targets.hf_target import HfTarget
     from engine.factory import build_evaluator, quantization_spec

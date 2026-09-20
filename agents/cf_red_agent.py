@@ -47,7 +47,7 @@ class CFRedAgent(BaseRedAgent):
                  template_path: str = "prompts/red/cf_v1.yaml",
                  dtype: str = "bfloat16", device: str = "cuda",
                  do_sample: bool = True, temperature: float = 0.7, top_p: float = 0.9,
-                 max_new_tokens: int = 320, rng: Optional[random.Random] = None,
+                 max_new_tokens: int = 192, rng: Optional[random.Random] = None,
                  enforced: bool = True) -> None:
         self.enforced = enforced
         self.model_path = model_path
