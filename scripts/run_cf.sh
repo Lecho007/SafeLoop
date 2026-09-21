@@ -6,8 +6,7 @@ export PYTHONPATH=.
 PY=/home/MMCP/miniforge3/envs/safeLoop/bin/python
 for attempt in 1 2 3 4 5; do
   echo "[run_cf] attempt $attempt $(date)"
-  RESUME=""
-  if [ $attempt -gt 1 ]; then RESUME="True"; fi
+  RESUME="True"   # 始终 resume：有检查点续跑，无检查点自动冷启动
   $PY -c "
 import sys; sys.path.insert(0, '.')
 from experiments.stage1cf import main

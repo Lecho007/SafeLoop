@@ -54,8 +54,19 @@ print(int(sorted(d)[len(d)//2]/60) if d else 0)" 2>/dev/null)
   CUR_REM=$((PACE - ROUND_EL)); [ "$CUR_REM" -lt 0 ] && CUR_REM=0
   REM_MIN=$(( CUR_REM + (REM_ROUNDS>0 ? (REM_ROUNDS-1)*PACE : 0) + EVAL_MIN ))
   PCT=$((DONE * 100 / TOTAL))
-  LINE="CF实验 $DONE/$TOTAL [$(draw_bar $((DONE*BAR_W/TOTAL)) $BAR_W)] ${PCT}%"
-  LINE="$LINE | r${ROUND_N}/5 已${ROUND_EL}m | ~${PACE}m/轮 | ETA $(fmt_hm $REM_MIN)→$(date -d "+$REM_MIN minutes" '+%H:%M' 2>/dev/null)"
+  # 相位级实时（来自 PHASE 行；旧进程无此行时回退为轮级显示）
+  PHASE_LINE=$(grep -aE "PHASE cond=" "$LOG" 2>/dev/null | tail -1)
+  PHASE_INFO=""
+  if [ -n "$PHASE_LINE" ]; then
+    P_COND=$(echo "$PHASE_LINE" | grep -oE "cond=[A-Z_0-9]+" | cut -d= -f2)
+    P_NAME=$(echo "$PHASE_LINE" | grep -oE "phase=[a-z]+" | cut -d= -f2)
+    P_ITEM=$(echo "$PHASE_LINE" | grep -oE "item=[0-9]+/[0-9]+" | cut -d= -f2-)
+    P_TS=$(echo "$PHASE_LINE" | grep -oE "[0-9]{2}:[0-9]{2}:[0-9]{2}" | head -1)
+    PHASE_INFO="|$P_COND·${P_NAME} ${P_ITEM} "
+    [ -n "$P_TS" ] && PHASE_INFO="$PHASE_INFO($(date -d "$P_TS" '+%H:%M' 2>/dev/null)) "
+  fi
+  LINE="CF实验 $DONE/$TOTAL [$(draw_bar $((DONE*BAR_W/TOTAL)) $BAR_W)] ${PCT}% $PHASE_INFO"
+  LINE="$LINE|r${ROUND_N}/5 ${ROUND_EL}m |~${PACE}m/轮|ETA $(fmt_hm $REM_MIN)→$(date -d "+$REMAIN minutes" '+%H:%M' 2>/dev/null)"
   # 实时模式：每秒走秒表；日志一有新行立即重绘（文件大小监测，无 inotify 依赖）
   printf '\r%-110s' "$LINE"
   # 单行显示：错误流静默，秒级时钟 + 日志增长即时重绘

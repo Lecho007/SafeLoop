@@ -138,7 +138,9 @@ class BatchRunner:
             logger.info("round %d: %d active episodes", _round, len(active))
 
             # Phase 1: Red 驻留，批量生成 action
-            for slot in active:
+            for _i, slot in enumerate(active, 1):
+                logger.info("PHASE cond=%s phase=red item=%d/%d",
+                            slot.condition_id, _i, len(active))
                 decision = slot.coordinator.decide(slot.state)
                 if decision.stop:
                     slot.done = True
@@ -155,17 +157,21 @@ class BatchRunner:
                 self.model_manager.release()
 
             # Phase 2: Target 驻留，批量响应
-            for slot in active:
+            for _i, slot in enumerate(active, 1):
                 if slot.pending_action is None:
                     continue
+                logger.info("PHASE cond=%s phase=target item=%d/%d",
+                            slot.condition_id, _i, len(active))
                 slot.pending_response = self.target.generate(slot.pending_action.prompt)
             if self.model_manager is not None:
                 self.model_manager.release()
 
             # Phase 3: Judge 驻留，批量判定
-            for slot in active:
+            for _i, slot in enumerate(active, 1):
                 if slot.pending_action is None:
                     continue
+                logger.info("PHASE cond=%s phase=judge item=%d/%d",
+                            slot.condition_id, _i, len(active))
                 slot.pending_judge = self.judge.evaluate(
                     task=slot.task,
                     action=slot.pending_action,
