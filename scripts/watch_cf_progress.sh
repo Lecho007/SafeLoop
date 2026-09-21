@@ -81,6 +81,6 @@ print(int(sorted(d)[len(d)//2]/60) if d else 0)" 2>/dev/null || echo 0)
   nvidia-smi --query-gpu=memory.used,utilization.gpu,temperature.gpu --format=csv,noheader 2>/dev/null | \
     awk -F', ' '{printf "  GPU: 显存 %s / 利用率 %s / 温度 %s°C\n", $1, $2, $3}'
   echo "================================================================"
-  echo "  (每 30 秒刷新 | Ctrl+C 退出不影响实验)"
-  sleep 30
+  echo "  (每 5 秒刷新 | Ctrl+C 退出不影响实验)"
+  sleep 5
 done
