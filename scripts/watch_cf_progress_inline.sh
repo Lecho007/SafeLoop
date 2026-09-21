@@ -54,11 +54,9 @@ print(int(sorted(d)[len(d)//2]/60) if d else 0)" 2>/dev/null)
   CUR_REM=$((PACE - ROUND_EL)); [ "$CUR_REM" -lt 0 ] && CUR_REM=0
   REM_MIN=$(( CUR_REM + (REM_ROUNDS>0 ? (REM_ROUNDS-1)*PACE : 0) + EVAL_MIN ))
   PCT=$((DONE * 100 / TOTAL))
-  LINE1="CF实验: $DONE/$TOTAL [$(draw_bar $((DONE*BAR_W/TOTAL)) $BAR_W)] ${PCT}%"
-  LINE2="round ${ROUND_N}/5 | 已观测 ${ELAPSED}m | 节奏 ~${PACE}m/轮 | ETA $(fmt_hm $REM_MIN) → $(date -d "+$REM_MIN minutes" '+%H:%M' 2>/dev/null)"
-  # 原地刷新（\r 覆盖；预留空格清除残留）
-  printf '\r%-%ds' $((BAR_W + 30)) "$LINE1"
-  printf '\n\r%s%b' "$LINE2" "$(printf '%*s' $((BAR_W + 40)) '')"
-  printf '\r\r\033[A'   # 光标回到第一行
+  LINE="CF实验 $DONE/$TOTAL [$(draw_bar $((DONE*BAR_W/TOTAL)) $BAR_W)] ${PCT}%"
+  LINE="$LINE | r${ROUND_N}/5 已${ROUND_EL}m | ~${PACE}m/轮 | ETA $(fmt_hm $REM_MIN)→$(date -d "+$REM_MIN minutes" '+%H:%M' 2>/dev/null)"
+  # tqdm 式单行原地刷新：\r 覆盖 + 尾部空格清除残留
+  printf '\r%-110s' "$LINE"
   sleep 5
 done
