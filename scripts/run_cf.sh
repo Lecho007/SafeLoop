@@ -1,6 +1,7 @@
 #!/bin/bash
 # Stage 1B-CF 运行器：崩溃自动重启（WSL2 驱动瞬断），断点续跑
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# expandable_segments removed: PyTorch 2.1.x CUDACachingAllocator !handles_ assert
+# under repeated load/unload (known bug); default allocator + sequential loading suffices
 export PYTHONPATH=.
 PY=/home/MMCP/miniforge3/envs/safeLoop/bin/python
 for attempt in 1 2 3 4 5; do
