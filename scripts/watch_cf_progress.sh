@@ -13,7 +13,8 @@ while true; do
   echo "================ SafeLoop Stage 1B-CF 实验进度 ================"
   RUNNING=0
   if pgrep -f run_cf.sh > /dev/null 2>&1; then RUNNING=1; fi
-  ATTEMPT=$(grep -cE "^\[run_cf\] attempt" "$LOG" 2>/dev/null || echo 0)
+  ATTEMPT=$(grep -cE "^\[run_cf\] attempt" "$LOG" 2>/dev/null)
+  [ -z "$ATTEMPT" ] && ATTEMPT=0
   if [ "$RUNNING" -eq 1 ]; then
     echo "状态: 运行中 (attempt #$ATTEMPT)    PID: $(pgrep -f run_cf.sh | head -1)"
   elif [ -f outputs/reports/stage1b_cf_4060.json ]; then
@@ -30,7 +31,8 @@ while true; do
     STEPS=0
     [ -f "$CKPT" ] && STEPS=$(python3 -c "
 import json; d=json.load(open('$CKPT')); print(sum(len(s['steps']) for s in d['slots']))" 2>/dev/null || echo 0)
-    LOGSTEPS=$(grep -cE "INFO \[$COND\].*round=[0-9]" "$LOG" 2>/dev/null || echo 0)
+    LOGSTEPS=$(grep -cE "INFO \[$COND\].*round=[0-9]" "$LOG" 2>/dev/null)
+    [ -z "$LOGSTEPS" ] && LOGSTEPS=0
     [ "$LOGSTEPS" -gt "$STEPS" ] && STEPS=$LOGSTEPS
     DONE=$((DONE + STEPS))
     FILLED=$((STEPS * 20 / 150)); EMPTY=$((20 - FILLED))
