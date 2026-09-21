@@ -58,14 +58,13 @@ print(int(sorted(d)[len(d)//2]/60) if d else 0)" 2>/dev/null)
   LINE="$LINE | r${ROUND_N}/5 已${ROUND_EL}m | ~${PACE}m/轮 | ETA $(fmt_hm $REM_MIN)→$(date -d "+$REM_MIN minutes" '+%H:%M' 2>/dev/null)"
   # 实时模式：每秒走秒表；日志一有新行立即重绘（文件大小监测，无 inotify 依赖）
   printf '\r%-110s' "$LINE"
+  # 单行显示：错误流静默，秒级时钟 + 日志增长即时重绘
   PRE_SIZE=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
-  WAITED=0
-  while [ $WAITED -lt 1 ]; do
+  I=0
+  while [ $I -lt 10 ]; do
     sleep 0.1
     NOW_SIZE=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
-    if [ "$NOW_SIZE" != "$PRE_SIZE" ]; then
-      break   # 日志有新数据 → 立即跳出重绘
-    fi
-    WAITED=$(python3 -c "print($WAITED + 0.1)")
+    [ "$NOW_SIZE" != "$PRE_SIZE" ] && break
+    I=$((I + 1))
   done
 done
