@@ -329,7 +329,27 @@ CF-11    26.7%   0.187  5.07   0.053   1.00  1.00/.75/1.00/.36   23/15/97/15/0
   按设计 §29 的分支逻辑：CONTROL PASS + OUTCOME FAIL → 指向单步控制规则
   （NONE→SWITCH）过激 / Hysteresis 方向，而非继续调 Judge。
 
-### 4.19 后续
+### 4.19 Stage 1B-CP 结果（2026-09-22，CP-H × 30 × B=5=150 queries）
+```
+         ASR@5   AUC-B  CTTS   SSR    HSR_E  SER   SUR    PRR   EAR    动作(K/R/S/RE)
+B0       36.7%   0.300  4.50   0.200  0.087   –     –      –     –      –
+CF-00V3  23.3%   0.227  4.87   0.000  0*      0.00  –      0.063 0.042  9/20/121/0
+CF-10    36.7%   0.300  4.50   0.667  0.308   1.00  –      –    0.062  25/35/78/12
+CF-11    26.7%   0.187  5.07   0.658  0.053   1.00  0.038  –    0.038  23/15/97/15
+CP-H     20.0%   0.147  5.27   0.342  0.000   1.00  0.073  0.000 0.150  24/72/41/13
+```
+- CP-H1 动作结构：**SUPPORTED**——SWITCH 97→41（SSR 0.658→0.342），REFINE 15→72；
+- CP-H2 切换质量：**SUPPORTED（方向）**——SUR 0.038→0.073（约 2 倍）；
+- CP-H3 有效适应：**部分**——EAR 0.038→0.150（≈4 倍）但 PRR=0.000；
+- CP-H4 结果：**NOT SUPPORTED**——ASR@5 20.0% < B0 36.7%，AUC 0.147 < 0.300，
+  CTTS 5.27 > 4.50；task-level vs B0：2 胜/7 负/21 平，vs CF-11：2 胜/4 负/24 平；
+- 执行层保持健康（SER=1.0、CVR=1.0、FRR_KEEP/SWITCH=1.0、FRR_REFINE=0.61）。
+- 按设计 §18 分支：**CP-H 明显低于 B0 → 停止继续调 goal-domain SWITCH policy**。
+  接受结论：当前 Target/域上，显式跨策略族 switching 无稳定收益；Routing 收敛为
+  Task→(Judge, DomainControlPolicy)：content 域 KEEP/REFINE/SWITCH，
+  goal 域 KEEP/REFINE 为主（SWITCH 低频/关闭）。
+
+### 4.20 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
