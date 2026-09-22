@@ -1,0 +1,66 @@
+{
+  "CF-H1_polarity_fix": {
+    "stmt": "FDR 在线版（DRIFTED 占比大幅回落）",
+    "values": {
+      "V3在线": "DRIFTED 121/150=81%",
+      "CF_10": "12/150=8%",
+      "CF_11": "15/150=10%"
+    },
+    "verdict": "SUPPORTED（holdout FDR 0.029 + 在线 DRIFTED 率 81%→8-10%）"
+  },
+  "CF-H2_execution_fix": {
+    "stmt": "FRR_SWITCH: 0→~1；FRR_REFINE 0.06→≥0.80；FRR_KEEP≥0.95",
+    "values": {
+      "CF_10(soft)": {
+        "KEEP": 0.8824,
+        "REFINE": 0.4138,
+        "SWITCH": 1.0
+      },
+      "CF_11(enforced)": {
+        "KEEP": 1.0,
+        "REFINE": 0.75,
+        "SWITCH": 1.0
+      }
+    },
+    "verdict": "CF_11 PARTIAL（SWITCH/KEEP 达标；REFINE 0.75 < 0.80 门槛）",
+    "note": "SER=1.0：控制器强制下 100% 换族；CVR=1.0 约束全满足"
+  },
+  "CF-H3_behavior": {
+    "stmt": "EAR(CF11)>EAR(CF10) 且 PRR>V3 的 0.063",
+    "values": {
+      "EAR_CF10": 0.0625,
+      "EAR_CF11": 0.038,
+      "HSR_E": {
+        "CF10": 0.3077,
+        "CF11": 0.0526
+      }
+    },
+    "verdict": "NOT SUPPORTED"
+  },
+  "CF-H4_outcome": {
+    "stmt": "CF11 ≥ B0（ASR/AUC/CTTS）",
+    "values": {
+      "CF_10": {
+        "ASR@5": 0.3667,
+        "AUC": 0.3,
+        "CTTS": 4.5
+      },
+      "CF_11": {
+        "ASR@5": 0.2667,
+        "AUC": 0.187,
+        "CTTS": 5.07
+      },
+      "B0": {
+        "ASR@5": 0.3667,
+        "AUC": 0.3,
+        "CTTS": 4.5
+      }
+    },
+    "verdict": "CF_10 = 恢复到 B0 完全持平；CF_11 低于 B0"
+  },
+  "CF-H5_execution_increment": {
+    "stmt": "CF11 > CF10",
+    "values": "CF11 (26.7/0.187/5.07) < CF10 (36.7/0.300/4.50)",
+    "verdict": "NOT SUPPORTED（enforced 在当前分布上反降）"
+  }
+}

@@ -305,7 +305,31 @@ polarity 判定成为新的主导误差源。
   V3 正向保留项：三级信号在线成立、解析 150/150、rebuttal 语义错误未复发、
   PARTIAL 真实存在（24）。
 
-### 4.18 后续
+### 4.18 Stage 1B-CF 在线结果（2026-09-22，CF-10/CF-11 × 30 × B=5=300 queries）
+```
+         ASR@5   AUC-B  CTTS   HSR_E  SER   FRR_K/R/S/R_        动作分布(K/R/S/RE/U)
+B0       36.7%   0.300  4.50   0.087   –     (无反馈)             –
+CF-00V3  23.3%   0.227  4.87   0*      0.00  1.00/.06/0.00/–     9/20/121/0/0
+CF-10    36.7%   0.300  4.50   0.308   1.00  .88/.41/1.00/.00    25/35/78/12/0
+CF-11    26.7%   0.187  5.07   0.053   1.00  1.00/.75/1.00/.36   23/15/97/15/0
+```
+*HSR_E：E=success 后换族比例（V3 的 0 为结构性零值——SWITCH 未执行）。
+- **CF-H1 polarity 修复：SUPPORTED**——holdout FDR 0.029；在线 DRIFTED 率 81%→8–10%，
+  REALIGN 降为低频事件（12–15 次）；
+- **CF-H2 执行修复：CF-11 基本 SUPPORTED**——FRR_SWITCH 0→**1.00**（SER=1.0，
+  CVR=1.0 约束全满足）、FRR_KEEP 1.00；FRR_REFINE 0.06→0.75（略低于 0.80 门槛）；
+- **CF-H4：CF-10 完全恢复到 B0**（36.7%/0.300/4.50 三项逐位持平）——polarity 修复
+  消除了 V3 的系统性退化；**CF-11 低于 B0**（26.7%/0.187）；
+- **CF-H3/H5：NOT SUPPORTED**——EAR 未升（0.062→0.038），enforced 执行在当前
+  分布上无独立正增量。机制观察：enforced SWITCH 严格执行后 SSR≈0.66 高频换族，
+  但换族后的有效方向率（ESSR 0.038）极低——策略族轮换本身不产生有效探索，
+  与 1B-A content 域结论不同（该域 KEEP 保护是主要收益来源）。
+- **总判定：CONTROL PASS（部分）/ OUTCOME 未达标**——观测与执行两层已修好
+  （H1/H2），但 goal-compliance 域的强制换族策略在该 Target 上不产生收益。
+  按设计 §29 的分支逻辑：CONTROL PASS + OUTCOME FAIL → 指向单步控制规则
+  （NONE→SWITCH）过激 / Hysteresis 方向，而非继续调 Judge。
+
+### 4.19 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
