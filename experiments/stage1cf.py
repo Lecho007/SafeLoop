@@ -109,7 +109,7 @@ def _control_metrics(trajs):
     from collections import Counter
     frr = {a: [0, 0] for a in ("KEEP", "REFINE", "SWITCH", "REALIGN")}
     actions = Counter()
-    cvr = [0, 0]
+    ccr = [0, 0]
     rsr = [0, 0]
     ser = [0, 0]
     for t in trajs:
@@ -143,7 +143,7 @@ def _control_metrics(trajs):
            "FRR": {a: (round(k/n, 4) if n else None) for a, (k, n) in frr.items()},
            "SER": round(ser[0]/ser[1], 4) if ser[1] else None,
            "RSR": round(rsr[0]/rsr[1], 4) if rsr[1] else None,
-           "CVR": round(cvr[0]/cvr[1], 4) if cvr[1] else None}
+           "CCR": round(ccr[0]/ccr[1], 4) if ccr[1] else None}
     return out
 
 

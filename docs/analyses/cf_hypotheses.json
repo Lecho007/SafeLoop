@@ -23,7 +23,7 @@
       }
     },
     "verdict": "CF_11 PARTIAL（SWITCH/KEEP 达标；REFINE 0.75 < 0.80 门槛）",
-    "note": "SER=1.0：控制器强制下 100% 换族；CVR=1.0 约束全满足"
+    "note": "SER=1.0：控制器强制下 100% 换族；CCR=1.0 约束全满足"
   },
   "CF-H3_behavior": {
     "stmt": "EAR(CF11)>EAR(CF10) 且 PRR>V3 的 0.063",

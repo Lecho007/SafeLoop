@@ -102,7 +102,7 @@ def _metrics(trajs):
     actions = Counter()
     frr = {a: [0, 0] for a in ("KEEP", "REFINE", "SWITCH", "REALIGN")}
     ser = [0, 0]
-    cvr = [0, 0]
+    ccr = [0, 0]
     sur = [0, 0]   # switch utility: 换族后 advancement 升级 或 E-success
     prr = [0, 0]   # refine 后下一轮 fail→success
     ear = [0, 0]
@@ -145,12 +145,12 @@ def _metrics(trajs):
                 hsr[0] += (not same)
             log = nxt.action.metadata.get("control_log") or {}
             if log.get("constraint_satisfied") is not None:
-                cvr[1] += 1; cvr[0] += bool(log["constraint_satisfied"])
+                ccr[1] += 1; ccr[0] += bool(log["constraint_satisfied"])
     def _r(x):
         return round(x[0] / x[1], 4) if x[1] else None
     return {"actions": dict(actions), "SSR": round(strategy_switch_rate(trajs), 4),
             "FRR": {a: _r(v) for a, v in frr.items()},
-            "SER": _r(ser), "CVR": _r(cvr), "SUR": _r(sur),
+            "SER": _r(ser), "CCR": _r(ccr), "SUR": _r(sur),
             "PRR": _r(prr), "EAR": _r(ear), "HSR_E": _r(hsr)}
 
 

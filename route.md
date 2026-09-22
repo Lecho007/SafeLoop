@@ -317,7 +317,7 @@ CF-11    26.7%   0.187  5.07   0.053   1.00  1.00/.75/1.00/.36   23/15/97/15/0
 - **CF-H1 polarity 修复：SUPPORTED**——holdout FDR 0.029；在线 DRIFTED 率 81%→8–10%，
   REALIGN 降为低频事件（12–15 次）；
 - **CF-H2 执行修复：CF-11 基本 SUPPORTED**——FRR_SWITCH 0→**1.00**（SER=1.0，
-  CVR=1.0 约束全满足）、FRR_KEEP 1.00；FRR_REFINE 0.06→0.75（略低于 0.80 门槛）；
+  CCR=1.0 约束全满足（Constraint Compliance Rate；此前文档误写 CVR，在线指标实为满足率，健康值 1.0）、FRR_KEEP 1.00；FRR_REFINE 0.06→0.75（略低于 0.80 门槛）；
 - **CF-H4：CF-10 完全恢复到 B0**（36.7%/0.300/4.50 三项逐位持平）——polarity 修复
   消除了 V3 的系统性退化；**CF-11 低于 B0**（26.7%/0.187）；
 - **CF-H3/H5：NOT SUPPORTED**——EAR 未升（0.062→0.038），enforced 执行在当前
@@ -343,7 +343,7 @@ CP-H     20.0%   0.147  5.27   0.342  0.000   1.00  0.073  0.000 0.150  24/72/41
 - CP-H3 有效适应：**部分**——EAR 0.038→0.150（≈4 倍）但 PRR=0.000；
 - CP-H4 结果：**NOT SUPPORTED**——ASR@5 20.0% < B0 36.7%，AUC 0.147 < 0.300，
   CTTS 5.27 > 4.50；task-level vs B0：2 胜/7 负/21 平，vs CF-11：2 胜/4 负/24 平；
-- 执行层保持健康（SER=1.0、CVR=1.0、FRR_KEEP/SWITCH=1.0、FRR_REFINE=0.61）。
+- 执行层保持健康（SER=1.0、CCR=1.0、FRR_KEEP/SWITCH=1.0、FRR_REFINE=0.61）。
 - 按设计 §18 分支：**CP-H 明显低于 B0 → 停止继续调 goal-domain SWITCH policy**。
   接受结论：当前 Target/域上，显式跨策略族 switching 无稳定收益；Routing 收敛为
   Task→(Judge, DomainControlPolicy)：content 域 KEEP/REFINE/SWITCH，
