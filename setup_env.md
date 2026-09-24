@@ -162,6 +162,13 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True nohup $PY scripts/run_stage1a.p
 # 中断后（断电/崩溃/手动停止）加 --resume 从最近完成轮次继续：
 #   $PY scripts/run_stage1a.py --config configs/hardware/rtx4060_8g_1ba.yaml --resume
 
+# Stage 1B-R 主实验（任务感知反馈路由：4 causal branches × 1000 queries，单夜跑）
+setsid nohup bash scripts/run_1br.sh > outputs/logs/stage1b_r.log 2>&1 < /dev/null &
+# 顺序：A(content·NONE)→B(content·ACTIVE)→C(goal·NONE)→D(goal·ACTIVE·CF-10)
+#       →EVAL(StrongREJECT)→SHADOW(goal 离线影子重判)→REPORT(三条件组装+R-H1~H5)
+# 崩溃自动重启（始终 resume）；中断后重跑同命令即续。
+# 进度条（另开终端）：bash scripts/watch_1br_progress.sh
+
 # Stage 1B-CP（控制策略验证：refine-first + delayed switch，150 queries）
 setsid nohup bash scripts/run_cp.sh > outputs/logs/stage1b_cp.log 2>&1 < /dev/null &
 # 断点续跑 + 崩溃自动重启（5 次）；报告 outputs/reports/stage1b_cp_4060.json

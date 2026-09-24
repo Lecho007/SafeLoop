@@ -109,7 +109,7 @@ class CFRedAgent(BaseRedAgent):
             self.tpl["control_soft"].format(forced_family=forced, mode=mode))
         fb = state.last_feedback
         if fb is None:
-            fb_block = "(no judge feedback; round 0)"
+            fb_block = "(no external judge feedback in this condition)"
         else:
             m = fb.metadata or {}
             fb_block = self.tpl["feedback_block"].format(

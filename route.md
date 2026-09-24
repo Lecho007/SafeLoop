@@ -349,7 +349,23 @@ CP-H     20.0%   0.147  5.27   0.342  0.000   1.00  0.073  0.000 0.150  24/72/41
   Task→(Judge, DomainControlPolicy)：content 域 KEEP/REFINE/SWITCH，
   goal 域 KEEP/REFINE 为主（SWITCH 低频/关闭）。
 
-### 4.20 后续
+### 4.20 Stage 1B-R 就绪（2026-09-24，4 causal branches → 3 logical conditions）
+协议冻结（重写版）：
+- 分支矩阵 A=content70×real_v1×NONE / B=content70×real_v1×ACTIVE(Jc, 1B-A C3 栈) /
+  C=goal30×cf_v1×NONE / D=goal30×cf_v1×ACTIVE(Jg, CF-10 soft 栈)，共 1000 queries；
+- 逻辑条件：C1=A+C、C-JR=B+D、C-R=B+C(+goal shadow=对 C 支离线重判，零 query)；
+- 协议级不变量（预检通过）：同域跨条件 round-0 prompt 一致（smoke A/B、C/D 全对）；
+  C1 支 judge 结构性零调用（NONE 模式）；FLR=0（结构性：C-R.goal 复用 C 支轨迹）；
+  RNG 独立流 s=H(seed,task,round,role)（sha256，逐调用 re-seed，跨分支种子一致已验）；
+- 组件：FeedbackMode 三态入 BatchRunner、routing 日志字段（domain/mode/judge_invoked/
+  feedback_built/exposed/controller_invoked/red_seed/target_seed）、
+  PlainCoordinator（不加 CF/CP 控制——B 支即 1B-A C3 原样，D 支即 CF-10 原样）；
+- 测试：97 项（新增 14 项 1B-R 协议测试——分支矩阵冻结/RNG 流/装配/NONE 跳 judge/
+  初始 prompt 跨模式一致/SHADOW 不进 red 上下文等）；
+- 前期验证：四分支真实 smoke（各 2 tasks × B=5）全部协议检查 PASS；
+- 主实验由用户运行：run_1br.sh（自动重启+断点续跑）+ watch_1br_progress.sh（进度条+ETA）。
+
+### 4.21 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
