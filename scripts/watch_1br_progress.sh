@@ -10,7 +10,7 @@ START_TS=$(date +%s)
 
 draw_bar() { local f=$1 w=$2 e=$((w-f)) out=""; [ $f -lt 0 ] && f=0; [ $f -gt $w ] && f=$w
   for ((i=0;i<f;i++)); do out+="█"; done; for ((i=0;i<e;i++)); do out+="░"; done; printf '%s' "$out"; }
-fmt_hm() { printf '%dh%02dm' $(($1/60)) $(($1%60)); }
+fmt_hm() { local m=${1:-0}; printf '%dh%02dm' $((m/60)) $((m%60)); }
 
 BR_QUERIES=(350 350 150 150)   # A B C D
 BR_ORDER=(A B C D)
@@ -46,14 +46,18 @@ d=[b-a for a,b in zip(ts,ts[1:]) if 0<b-a<7200]
 print(int(sorted(d)[len(d)//2]/60) if d else 0)" 2>/dev/null)
     [ -z "$PACE" ] || [ "$PACE" -lt 5 ] && PACE=$DEFAULT_ROUND_MIN
   fi
-  if [ "$DONE" -gt 0 ] && [ "$ELAPSED" -gt 0 ]; then
-    RATE=$(python3 -c "print('{:.1f}'.format($DONE/max(1,$ELAPSED)))")
-    REMAIN=$(python3 -c "print(int(($TOTAL-$DONE)/max(0.01,$RATE)) + $EVAL_MIN))")
+  # 用实验日志起点（而非本显示脚本启动时间）估流速
+  FIRST_TS=$(grep -aE "^\[run_1br\] A attempt 1" "$LOG" 2>/dev/null | grep -aoE "[A-Za-z]{3} [A-Za-z]{3} +[0-9]+ [0-9:]+" | head -1)
+  EXP_START=$(date -d "$FIRST_TS" +%s 2>/dev/null || echo $START_TS)
+  RUN_MIN=$(( (NOW - EXP_START) / 60 ))
+  if [ "$DONE" -gt 0 ] && [ "$RUN_MIN" -gt 0 ]; then
+    RATE=$(python3 -c "print('{:.1f}'.format($DONE/max(1,$RUN_MIN)))")
+    REMAIN=$(python3 -c "print(int(($TOTAL-$DONE)/max(0.01,$RATE)) + $EVAL_MIN)")
   else
     REMAIN=$(( 40 * 25 + EVAL_MIN )); RATE="…"
   fi
   PCT=$((DONE * 100 / TOTAL))
-  LINE="1B-R $DONE/$TOTAL [$(draw_bar $((DONE*BAR_W/TOTAL)) $BAR_W)] ${PCT}% $PH|step=${STEP_NAME:-init} |${ELAPSED}m |~${PACE}m/轮|v${RATE}/m"
+  LINE="1B-R $DONE/$TOTAL [$(draw_bar $((DONE*BAR_W/TOTAL)) $BAR_W)] ${PCT}% $PH|step=${STEP_NAME:-init} |run ${RUN_MIN}m |~${PACE}m/round|v${RATE}/m"
   LINE="$LINE|ETA $(fmt_hm $REMAIN)→$(date -d "+$REMAIN minutes" '+%m-%d %H:%M' 2>/dev/null)"
   printf '\r%-125s' "$LINE"
   PRE=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
