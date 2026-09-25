@@ -29,7 +29,7 @@ pip install "numpy<2"     # 装成 numpy 1.26.4
 # 环境自检（应全部输出正常）
 python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 python -c "import torch; x=torch.randn(4,4,dtype=torch.bfloat16).cuda(); print(torch.nn.functional.scaled_dot_product_attention(x,x,x).shape)"
-python -m unittest discover -s tests    # 52 项全过
+python -m unittest discover -s tests    # 145 项全过
 ```
 
 环境路径：`/home/MMCP/miniforge3/envs/safeLoop`（下文以 `$PY` 代指
@@ -89,7 +89,7 @@ python scripts/check_weights.py    # 完成后校验
 ## SafeLoop-core 框架层依赖
 
 ```bash
-pip install -r requirements.txt        # 仅 pyyaml（框架/dry-run/分析，系统 python 即可）
+pip install -r requirements.txt        # pyyaml + rich（框架/dry-run/分析/终端 CLI）
 ```
 
 GPU 真实运行的全部依赖已包含在上面的锁定版本里（transformers/peft/bitsandbytes/accelerate）。
@@ -120,7 +120,7 @@ Stage 1C / Judge 校准 / Track-ZH 阶段再下载。
 # 环境变量（二选一）：
 export PY=/home/MMCP/miniforge3/envs/safeLoop/bin/python   # 或 mamba activate safeLoop
 
-# 单元测试（43 项；框架层用系统 python 即可）
+# 单元测试（145 项；框架层需 pyyaml + rich，见 requirements.txt）
 python -m unittest discover -s tests -v
 
 # Stage 1A dry-run（无权重无 GPU，scripted 后端走同一 round-batched 管道）
@@ -180,7 +180,9 @@ PYTHONPATH=. $PY apps/cli/safeloop_cli.py api-eval \
 #   target: {backend: api, provider: openai_chat,
 #            base_url: https://…/v1, model: my-model,
 #            api_key_env: TARGET_API_KEY,
-#            generation: {temperature: 0.7, max_tokens: 512, timeout: 60, retries: 3}}
+#            generation: {temperature: 0.7, max_tokens: 4096, timeout: 60, retries: 3}}
+#            ↑ max_tokens 默认已 4096（82c027d）：推理型模型（deepseek-flash/reasoner）
+#              的思考链消耗同一 completion 预算，旧默认 512 会把最终回答截成空
 
 # ================= SafeLoop v1.0 作品层（2026-09-25，d72323c）=================
 # Workbench GUI（浏览器四页工作台：输入→多智能体运行视图→轨迹证据链→报告）
@@ -199,6 +201,19 @@ PYTHONPATH=. $PY -m uvicorn apps.api.server:app --port 8712
 # CLI
 PYTHONPATH=. python3 apps/cli/safeloop_cli.py report stage1b_r_4060   # 预跑报告
 PYTHONPATH=. $PY apps/cli/safeloop_cli.py evaluate --mode compare --max-tasks 4  # 现场小子集
+
+# 终端工作台（2026-09-25，af8f42f：向导式 CLI GUI + rich 实时对话流 + 彩色结果报告）
+# 必须在 safeLoop 环境跑（引擎要 transformers——base 环境只装了 rich，跑到引擎才报错）
+PYTHONPATH=. $PY apps/cli/workbench_cli.py                       # 交互向导：目标→模式→场景数
+PYTHONPATH=. $PY apps/cli/workbench_cli.py --mode standard -n 3   # 带参数直接跑（可加 --suite/--config/--budget）
+# DeepSeek 等推理型黑盒（key 只经环境变量；回答预算默认 4096，思考链不会截空回答）：
+export TARGET_API_KEY="sk-..."
+PYTHONPATH=. $PY apps/cli/workbench_cli.py \
+    --base-url https://api.deepseek.com/v1 --model deepseek-flash --mode standard -n 3
+# 重渲染已保存的报告 JSON：
+PYTHONPATH=. $PY apps/cli/workbench_cli.py report outputs/reports/run-x_report.json
+# 结果解读：判别列=Qwen3Guard 过程观察（Unsafe≠风险）；E 列=StrongREJECT 最终裁决
+# （风险只数 E:风险确认）；出现"（空回答）"轮次时结论偏乐观，需调大回答预算重跑
 
 # Stage 1B-R 主实验（任务感知反馈路由：4 causal branches × 1000 queries，单夜跑）
 setsid nohup bash scripts/run_1br.sh > outputs/logs/stage1b_r.log 2>&1 < /dev/null &

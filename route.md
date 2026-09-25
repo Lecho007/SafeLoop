@@ -399,6 +399,35 @@ seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
 第二/三 Target 泛化 → Track-ZH。
 
+### 4.23 作品层（V1.0 三端）与终端工作台 CLI（2026-09-25）
+
+三端已交付：Streamlit 工作台四页（总览+实况 / 轨迹回放 / 风险发现 / 评估报告；
+布局重构、st.status 同步运行消闪烁、对话区滚动框，至 450bd70）、FastAPI+SSE
+（apps/api/server.py，/evaluations + SSE 事件流）、argparse CLI
+（apps/cli/safeloop_cli.py，纯 JSON 输出）。
+
+本期新增**终端工作台**（apps/cli/workbench_cli.py，af8f42f，rich 上色）：
+- 向导 + 参数双模式：无参进入向导（目标：本地 Phi-3.5 / 在线 API 黑盒（含
+  test_connection）→ 模式 standard/guided/compare → 场景数 2-10），带参直跑；
+  `report <json>` 子命令重渲染已存报告；
+- 实时画面：线程跑 agent.run() + rich.Live 轮询 live_events（0.4s），状态条 +
+  最近 8 轮对话流（红/黄/绿点规则与 GUI 一致）；非 tty 自动退化为逐行打印；
+  Ctrl+C → agent.cancel()；
+- 结果报告：风险档位（terms.py 同一套分级）+ ASR@k（取满预算轮）/AUC-B 星级/
+  CTTS + 风险分布条形图 + 场景明细（风险优先，`任务: JBB-XXXX | 类别（第N轮触发）`
+  紧凑格式）+ 对比模式 STD/GUI 对照 + 局限性；空回答醒目标记与数量警示；
+- 渲染层纯函数化（复用 terms.py），零 GPU 单测 24 项，全套 145 项 OK。
+
+**重要修复（82c027d）**：DeepSeek 等推理型模型的思考链消耗同一 completion 预算，
+API Target 默认 max_tokens=512 会被思考耗尽 → 最终回答为空（finish=length）；
+裁判对"空回答+有害问题"判 Unsafe、StrongREJECT 全部未触发 → 该类 run 结论无效
+（此前 deepseek 黑盒评测数值均不可信）。修复：默认 4096 + TargetResponse 记录
+finish_reason + CLI 空回答标记/警示。4096 实测：同一问题正文 2286 字符完整
+（旧 512 截为 251）。
+
+已知遗留：workbench GUI 取 ASR 用 `asr_at_k.get("5")`，B=3 预算下取不到、
+风险档位恒显"未定"；CLI 已改为取满预算轮，GUI 待修。
+
 ## 5. 目录结构（模块直接位于 SafeLoop 主目录）
 
 ```
@@ -414,6 +443,10 @@ SafeLoop/
 │                  offline_evaluator / metrics / stats
 ├── memory/  scheduler/  feedback/                      [V0.2 原样]
 ├── experiments/   conditions(C0–C3/C_SR/1A) / stage1 / stage1a
+├── safeloop/      v1.0 产品层：agents/main_agent（总控/实况缓冲） /
+│                  skills/{report,replay_loader}
+├── apps/          workbench（Streamlit 四页工作台） / api/server（FastAPI+SSE） /
+│                  cli/{safeloop_cli,workbench_cli 终端工作台}
 ├── prompts/       red/{v1,real_v1}.yaml / judge/{v1,qwenguard_v1}.yaml /
 │                  feedback/{score,outcome,structured}_v1.yaml
 ├── data/          tasks/{test,jbb20_demo}.jsonl / adapters/jailbreakbench.py /
@@ -421,7 +454,8 @@ SafeLoop/
 ├── configs/       stage1.yaml(V0.2 demo) / hardware/{v100_32g,rtx4060_8g}.yaml
 ├── scripts/       run_experiment / run_episode / run_stage1a / build_jbb_tasks /
 │                  check_weights / build_calibration_set / replay_trajectory
-├── tests/         43 项（schemas/protocol/stage1/parsers/stats/metrics/dry-run/hardware）
+├── tests/         145 项（schemas/protocol/stage1/parsers/stats/metrics/dry-run/hardware/
+│                  api_target/gui_terms/workbench_cli…）
 ├── weights/       red/ target/ judge/ evaluator/（见 setup_env.md 下载命令）
 ├── outputs/       trajectories / evaluations / disagreement / reports
 ├── paper/  route.md  setup_env.md  requirements.txt
