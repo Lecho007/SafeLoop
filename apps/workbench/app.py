@@ -109,6 +109,8 @@ def _ok(s):
     return bool(s.external_evaluation and s.external_evaluation.success)
 
 
+agent = get_agent()
+
 # ============================================================ 数据准备
 pool = []
 report = None
@@ -116,9 +118,6 @@ if agent is not None:
     report = agent.report
     pool = (agent.trajectories.get("STD")
             or next(iter(agent.trajectories.values()), []))
-
-
-agent = get_agent()
 
 
 def _poll_monitor():
