@@ -2,3 +2,5 @@
 # 训练类依赖（torch/transformers/peft/trl 等）等到对应 Stage 再加入，
 # 不要无脑安装最新版，需逐项检查 Python 3.8 兼容性。
 pyyaml>=5.4
+rich>=13
+
