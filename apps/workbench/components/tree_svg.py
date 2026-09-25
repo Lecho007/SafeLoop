@@ -61,10 +61,10 @@ def system_routing_tree(active_domain: Optional[str] = None,
 <text x="660" y="128" text-anchor="middle" class="rt-t">目标合规域 30%</text>
 <text x="660" y="146" text-anchor="middle" class="rt-s">冒充专家 经济损害 政务操纵</text></g>
 <g{c_dim}><rect class="rt-n rt-hot" x="110" y="212" width="180" height="54" rx="9" id="judge-content" {glow_jc}/>
-<text x="200" y="233" text-anchor="middle" class="rt-t">🔍 内容安全裁判</text>
+<text x="200" y="233" text-anchor="middle" class="rt-t">内容安全裁判</text>
 <text x="200" y="251" text-anchor="middle" class="rt-s">内容风险 + 拒绝信号</text></g>
 <g{g_dim}><rect class="rt-n rt-hot" x="570" y="212" width="180" height="54" rx="9" id="judge-goal" {glow_jg}/>
-<text x="660" y="233" text-anchor="middle" class="rt-t">🔍 目标推进裁判</text>
+<text x="660" y="233" text-anchor="middle" class="rt-t">目标推进裁判</text>
 <text x="660" y="251" text-anchor="middle" class="rt-s">有害目标推进 + 极性</text></g>
 <g{c_dim}><rect class="rt-n" x="110" y="272" width="180" height="44" rx="9" {glow_ctrl_c}/>
 <text x="200" y="290" text-anchor="middle" class="rt-s">观察记录（默认）</text>
@@ -73,7 +73,7 @@ def system_routing_tree(active_domain: Optional[str] = None,
 <text x="660" y="290" text-anchor="middle" class="rt-s">观察记录（默认）</text>
 <text x="660" y="304" text-anchor="middle" class="rt-s">引导反馈（实验）</text></g>
 <rect class="rt-n" x="330" y="300" width="200" height="44" rx="9" {glow_eval}/>
-<text x="430" y="318" text-anchor="middle" class="rt-t">⚖️ 独立评审官</text>
+<text x="430" y="318" text-anchor="middle" class="rt-t">独立评审官</text>
 <text x="430" y="334" text-anchor="middle" class="rt-s">离线裁决，闭环外</text>
 <text x="430" y="392" text-anchor="middle" class="rt-s" fill="#7E9AB0">
 安全任务 → 专业裁判 → 观察或引导 → 完整轨迹 → 独立评审（默认观察不干预，引导为实验能力）</text>
@@ -88,7 +88,8 @@ def system_routing_tree(active_domain: Optional[str] = None,
 
 # ============================================================ 单任务决策路径树
 def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = None,
-                       live: bool = False) -> str:
+                       live: bool = False,
+                       trigger_round: Optional[int] = None) -> str:
     """逐轮决策路径：节点=轮次（策略+信号色），边=决策动作。
 
     rounds: tree_model 产出的节点列表；live=True 时给活跃节点加脉冲。
@@ -121,6 +122,12 @@ def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = No
         if nd.get("signal"):
             parts.append('<circle cx="{}" cy="70" r="8" fill="{}"/>'
                          .format(cx, sig))
+        if trigger_round and nd.get("round") == trigger_round:
+            parts.append('<circle cx="{}" cy="70" r="36" fill="none" '
+                         'stroke="{}" stroke-width="2" stroke-dasharray="4 4"/>'
+                         '<text x="{}" y="34" text-anchor="middle" fill="{}" '
+                         'font-size="11" font-weight="700">触发</text>'
+                         .format(cx, RISK, cx, RISK))
         parts.append('<text x="{}" y="120" text-anchor="middle" class="dt">第{}轮</text>'
                      .format(cx, nd.get("round", i + 1)))
         strat = nd.get("strategy")
