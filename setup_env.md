@@ -162,6 +162,26 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True nohup $PY scripts/run_stage1a.p
 # 中断后（断电/崩溃/手动停止）加 --resume 从最近完成轮次继续：
 #   $PY scripts/run_stage1a.py --config configs/hardware/rtx4060_8g_1ba.yaml --resume
 
+# ===== 黑盒 API Target（v1.0：接入任意远端模型）=====
+# 三种协议：openai_chat（/chat/completions，兼容 vLLM/LiteLLM/网关，最广）/
+#          anthropic（/messages，Claude 原生）/ openai_responses（/responses，OpenAI 新）
+# Key 只经环境变量（永不写入任何落盘文件）：
+export TARGET_API_KEY="sk-..."
+# 连通测试（无害 ping）：
+PYTHONPATH=. python3 apps/cli/safeloop_cli.py test-connection \
+    --base-url https://api.example.com/v1 --model my-model --provider openai_chat
+# 黑盒评估（小子集演示）：
+PYTHONPATH=. $PY apps/cli/safeloop_cli.py api-eval \
+    --base-url https://api.example.com/v1 --model my-model \
+    --provider openai_chat --mode standard --max-tasks 3 --test-connection
+# API 侧：POST /targets/test-connection（body: provider/base_url/model/api_key_env）
+#         POST /evaluations 增加可选 api_target 字段
+# 配置式（configs）：
+#   target: {backend: api, provider: openai_chat,
+#            base_url: https://…/v1, model: my-model,
+#            api_key_env: TARGET_API_KEY,
+#            generation: {temperature: 0.7, max_tokens: 512, timeout: 60, retries: 3}}
+
 # ================= SafeLoop v1.0 作品层（2026-09-25，d72323c）=================
 # Workbench GUI（浏览器四页工作台：输入→多智能体运行视图→轨迹证据链→报告）
 PYTHONPATH=. $PY -m streamlit run apps/workbench/app.py --server.port 8510

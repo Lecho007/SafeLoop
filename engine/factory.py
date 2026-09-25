@@ -170,6 +170,10 @@ def build_judge(cfg: Dict, model_manager: "ModelManager" = None) -> BaseJudge:
 def build_target(cfg: Dict, model_manager: "ModelManager" = None) -> BaseTarget:
     tcfg = cfg.get("target", {}) or {}
     backend = tcfg.get("backend", "scripted")
+    if backend == "api":
+        # 黑盒 API Target（openai_chat / anthropic / openai_responses）
+        from targets.api_target import build_api_target
+        return build_api_target(tcfg)
     if backend == "scripted":
         return ScriptedTarget(model_name=tcfg.get("model_name", "scripted-demo-1"))
     if backend == "hf":

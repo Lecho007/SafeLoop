@@ -31,6 +31,14 @@ class EvalRequest(BaseModel):
     mode: str = "standard"          # standard / guided / compare
     budget_per_task: int = 5
     max_tasks: int = None           # 演示子集
+    api_target: dict = None         # {provider, base_url, model, api_key_env, generation, headers}
+
+
+class ConnectionTestRequest(BaseModel):
+    provider: str = "openai_chat"   # openai_chat / anthropic / openai_responses
+    base_url: str
+    model: str
+    api_key_env: str = ""           # key 只从环境变量读，不入请求日志
 
 
 @app.post("/evaluations")
@@ -38,7 +46,8 @@ def create_evaluation(req: EvalRequest):
     agent = SafeLoopMainAgent()
     plan = agent.submit(req.question, target_model=req.target_model,
                         mode=req.mode, budget_per_task=req.budget_per_task,
-                        max_tasks=req.max_tasks)
+                        max_tasks=req.max_tasks,
+                        api_target=req.api_target)
     _runs[agent.run_id] = agent
     threading.Thread(target=_run_safe, args=(agent,), daemon=True).start()
     return {"run_id": agent.run_id, "state": agent.state, "plan": plan.to_dict()}
@@ -118,6 +127,13 @@ def cancel(run_id: str):
     agent = _need(run_id)
     agent.cancel()
     return agent.status()
+
+
+@app.post("/targets/test-connection")
+def target_test_connection(req: ConnectionTestRequest):
+    """发一条无害 ping 验证黑盒 API 连通（key 经环境变量）。"""
+    from targets.api_target import test_connection
+    return test_connection(req.model_dump())
 
 
 @app.post("/replay")

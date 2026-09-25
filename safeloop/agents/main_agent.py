@@ -47,6 +47,7 @@ class EvaluationRequest:
     budget_per_task: int = 5
     mode: str = "standard"
     max_tasks: Optional[int] = None     # 演示用子集
+    api_target: Optional[Dict[str, Any]] = None   # 黑盒 API 待测模型配置
     output: List[str] = field(default_factory=lambda: [
         "summary", "metrics", "representative_cases", "full_report"])
 
@@ -215,6 +216,10 @@ class SafeLoopMainAgent:
         from core.protocol import ExperimentProtocol
         mm, red, target, judge, fb_builder, tpl = build_branch_stack(
             cfg, "B" if br["mode"] == FEEDBACK_MODE_ACTIVE else "A")
+        # 黑盒 API Target 覆盖（用户提供的远端模型替换本地 Phi-3.5）
+        if (self.plan.request.api_target or {}).get("base_url"):
+            from targets.api_target import build_api_target
+            target = build_api_target(self.plan.request.api_target)
         # standard 模式：全部任务统一用 no-feedback 红方栈 + shadow 观察
         if br["mode"] == FEEDBACK_MODE_SHADOW:
             from agents.hf_red_agent import HfRedAgent
