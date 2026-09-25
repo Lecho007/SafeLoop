@@ -3,9 +3,9 @@
 from typing import Any, Dict, List, Optional
 
 # 设计令牌（v2 融合版）
-DEEP, PANEL, TRACE = "#081420", "#0E1F2E", "#1E3A50"
-LENS, RISK, WARN, SAFE, LIVE = "#56D8E8", "#FF5C5C", "#FFB454", "#3ED598", "#8B7CF6"
-SIGNAL_HEX = {"risk": RISK, "warn": WARN, "safe": SAFE, None: "#5A7890"}
+DEEP, PANEL, TRACE = "#f7f8fb", "#ffffff", "#dfe5ee"
+LENS, RISK, WARN, SAFE, LIVE = "#2f6feb", "#e6465f", "#b66a08", "#16875d", "#7556d8"
+SIGNAL_HEX = {"risk": RISK, "warn": WARN, "safe": SAFE, None: "#9db0c4"}
 
 ACTION_ZH = {"KEEP": "保持", "REFINE": "细化", "SWITCH": "换策略",
              "REALIGN": "回正", "UNCERTAIN": "不确定"}
@@ -42,8 +42,8 @@ def system_routing_tree(active_domain: Optional[str] = None,
 </defs>
 <style>
  .rt-n{{fill:{panel};stroke:{trace};stroke-width:1.3}}
- .rt-t{{font-size:14px;font-weight:600;fill:#D8E8F0}}
- .rt-s{{font-size:10.5px;fill:#7E9AB0}}
+ .rt-t{{font-size:14px;font-weight:600;fill:#172033}}
+ .rt-s{{font-size:10.5px;fill:#67738a}}
  .rt-e{{stroke:{trace};stroke-width:1.8;fill:none}}
  .rt-hot{{stroke:{lens};stroke-width:1.6}}
 </style>
@@ -94,7 +94,7 @@ def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = No
     rounds: tree_model 产出的节点列表；live=True 时给活跃节点加脉冲。
     """
     if not rounds:
-        return ("<div style='color:#7E9AB0;padding:20px;text-align:center'>"
+        return ("<div style='color:#67738a;padding:20px;text-align:center'>"
                 "决策树将在任务开始后逐轮生长</div>")
     n = len(rounds)
     w, h = max(760, n * 180 + 80), 240
@@ -104,8 +104,8 @@ def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = No
              '<feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="{}"/>'
              '</filter></defs>'.format(LENS),
              '<style>.dn{fill:%s;stroke:%s;stroke-width:1.5}'
-             '.dt{font-size:13px;font-weight:600;fill:#D8E8F0}'
-             '.ds{font-size:11px;fill:#8FAABB}'
+             '.dt{font-size:13px;font-weight:600;fill:#172033}'
+             '.ds{font-size:11px;fill:#67738a}'
              '.de{stroke:%s;stroke-width:2;fill:none}'
              '.dl{font-size:12px;font-weight:600;fill:%s}</style>'
              % (PANEL, TRACE, TRACE, LENS)]

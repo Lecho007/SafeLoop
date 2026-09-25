@@ -26,36 +26,34 @@ st.set_page_config(page_title="SafeLoop 安全体检", page_icon="🛡️",
 # ============================================================ 设计令牌 + 全局样式
 st.markdown("""
 <style>
-:root{--deep:#081420;--panel:#0E1F2E;--panel2:#12283A;--trace:#1E3A50;
-      --lens:#56D8E8;--risk:#FF5C5C;--warn:#FFB454;--safe:#3ED598;
-      --live:#8B7CF6;--txt:#D8E8F0;--muted:#7E9AB0;}
-html,body,.stApp{background:var(--deep)!important;color:var(--txt);}
+:root{--bg:#f7f8fb;--panel:#ffffff;--panel2:#f5f7fb;--line:#dfe5ee;
+      --blue:#2f6feb;--blue-soft:#eef5ff;--risk:#e6465f;--warn:#b66a08;
+      --safe:#16875d;--live:#7556d8;--txt:#172033;--muted:#67738a;}
+html,body,.stApp{background:var(--bg)!important;color:var(--txt);}
 .stApp{font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;
-  background-image:
-    radial-gradient(circle at 85% -10%,rgba(86,216,232,.05),transparent 34rem),
-    linear-gradient(rgba(30,58,80,.14) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(30,58,80,.14) 1px,transparent 1px)!important;
-  background-size:auto,30px 30px,30px 30px!important;}
+  background-image:radial-gradient(circle at 52% 102%,rgba(22,135,93,.05),
+    transparent 28rem)!important;}
 h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
 .stTabs>div>div>button{color:var(--muted);font-weight:600;}
-.stTabs>div>div>button[aria-selected="true"]{color:var(--lens);}
-.stTabs [data-baseweb="tab-highlight"]{background:var(--lens);}
+.stTabs>div>div>button[aria-selected="true"]{color:var(--blue);}
+.stTabs [data-baseweb="tab-highlight"]{background:var(--blue);}
 .sl-sub{color:var(--muted);font-size:14px;margin:2px 0 0;}
-.sl-card{background:var(--panel);border:1px solid var(--trace);border-radius:10px;
-  padding:20px 24px;}
+.sl-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;
+  padding:20px 24px;box-shadow:0 1px 2px rgba(24,34,53,.04);}
 .sl-meta{color:var(--muted);font-size:13px;}
 .sl-answer{font-size:15.5px;line-height:1.8;color:var(--txt);}
-.sl-pill{display:inline-block;border:1px solid var(--trace);border-radius:999px;
-  padding:3px 12px;font-size:12.5px;color:var(--muted);margin:2px 6px 2px 0;}
-.sl-pill.on{border-color:var(--safe);color:var(--safe);}
-.sl-pill.live{border-color:var(--live);color:var(--live);}
+.sl-pill{display:inline-block;border:1px solid var(--line);border-radius:999px;
+  padding:3px 12px;font-size:12.5px;color:var(--muted);margin:2px 6px 2px 0;
+  background:#fafbfc;}
+.sl-pill.on{border-color:#bde4d3;background:#effaf5;color:#147451;}
+.sl-pill.live{border-color:#d6caf5;background:#f7f4ff;color:#684bc3;}
 .sl-dot{display:inline-block;width:11px;height:11px;border-radius:50%;
   margin-right:6px;vertical-align:-1px;}
 .sl-dot-red{background:var(--risk);} .sl-dot-green{background:var(--safe);}
-.sl-dot-amber{background:var(--warn);} .sl-dot-lens{background:var(--lens);}
+.sl-dot-amber{background:var(--warn);} .sl-dot-lens{background:var(--blue);}
 .sl-stats{display:flex;flex-wrap:wrap;margin-top:6px;}
 .sl-stat{flex:1;min-width:130px;padding:6px 18px 6px 0;
-  border-right:1px solid var(--trace);margin-right:18px;}
+  border-right:1px solid var(--line);margin-right:18px;}
 .sl-stat:last-child{border-right:none;margin-right:0;}
 .sl-num{font-size:32px;font-weight:300;line-height:1.2;color:var(--txt);
   font-variant-numeric:tabular-nums;}
@@ -63,22 +61,20 @@ h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
 .sl-cap{font-size:12.5px;color:var(--muted);margin-top:2px;}
 .sl-bar-row{display:flex;align-items:center;margin:5px 0;}
 .sl-bar-name{width:130px;font-size:13.5px;color:var(--txt);}
-.sl-bar{height:14px;background:var(--lens);border-radius:2px;}
+.sl-bar{height:14px;background:var(--blue);border-radius:2px;}
 .sl-bar-n{font-size:14px;margin-left:8px;color:var(--txt);
   font-variant-numeric:tabular-nums;}
-/* 聊天气泡 */
 .sl-bubble{border-radius:10px;padding:9px 14px;margin:5px 0;font-size:14px;
   line-height:1.65;max-width:86%;}
-.sl-q{background:#13293C;border-left:3px solid var(--lens);}
-.sl-a{background:#152B33;border-left:3px solid #3E8FA0;margin-left:auto;}
+.sl-q{background:var(--blue-soft);border-left:3px solid var(--blue);}
+.sl-a{background:#f0f4f8;border-left:3px solid #9db6cc;margin-left:auto;}
 .sl-role{font-size:12px;color:var(--muted);margin-bottom:2px;}
-/* 智能体坞 */
 .sl-dock{display:flex;flex-direction:column;gap:8px;}
 .sl-dock-item{display:flex;align-items:center;gap:10px;background:var(--panel);
-  border:1px solid var(--trace);border-radius:8px;padding:8px 12px;
+  border:1px solid var(--line);border-radius:10px;padding:8px 12px;
   font-size:13.5px;color:var(--muted);}
-.sl-dock-item.active{border-color:var(--lens);color:var(--txt);}
-.sl-dock-item.done{border-color:var(--safe);color:var(--txt);}
+.sl-dock-item.active{border-color:#b5cdf4;background:#f7faff;color:var(--txt);}
+.sl-dock-item.done{border-color:#afe0ca;background:#f5fcf8;color:var(--txt);}
 @media (prefers-reduced-motion:reduce){
   .hd-flow{animation:none!important;opacity:.85}
   .hd-pulse{animation:none!important}}
@@ -297,7 +293,7 @@ with tab1:
         with c3:
             st.markdown("**实况决策树**")
             shown = []
-            for nd in nodes[:max_step]:
+            for i, nd in enumerate(nodes[:max_step]):
                 nd2 = dict(nd)
                 nd2["state"] = ("red" if i == max_step - 1 and max_step < len(nodes)
                                 else "decided")
@@ -398,7 +394,7 @@ with tab4:
             "<div class='sl-cap'>风险发现率</div></div>"
             "<div class='sl-stat'><div class='sl-num'>{c}<b> 轮</b></div>"
             "<div class='sl-cap'>平均首次触发轮次</div></div>"
-            "<div class='sl-stat'><div class='sl-num' style='color:var(--lens)'>{s}</div>"
+            "<div class='sl-stat'><div class='sl-num' style='color:var(--blue)'>{s}</div>"
             "<div class='sl-cap'>探索效率</div></div></div>".format(
                 r=ov["risk_tasks"], t=ov["total_tasks"], a="{:.0%}".format(asr or 0),
                 c="{:.1f}".format(m.get("mean_ctts") or 0), s=stars(m.get("auc_b"))),
