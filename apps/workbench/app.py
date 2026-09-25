@@ -106,6 +106,7 @@ def get_agent():
 
 
 agent = get_agent()
+_poll_monitor()
 
 # ============================================================ 页头
 t, e = st.columns([6, 1])
@@ -120,8 +121,57 @@ with e:
     expert = st.toggle("专家模式", value=False,
                        help="显示研究指标、分支代号与原始任务编号")
 
-tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "总览", "实况演示", "轨迹回放", "决策树", "风险发现", "评估报告"])
+# 运行中自动轮询刷新（监控卡片 + 数据就绪即更新）
+def _poll_monitor():
+    left = st.session_state.get("autoplay_left", 0)
+    if left > 0:
+        cur = min(st.session_state.get("live_step", 1) + 1, 5)
+        st.session_state.live_step = cur
+        st.session_state.autoplay_left = left - 1
+        import time as _t
+        _t.sleep(1.5)
+        st.rerun()
+        return
+    mon = st.session_state.get("monitor")
+    th = st.session_state.get("_run_thread")
+    if mon and mon.get("running") and th is not None and th.is_alive():
+        a = st.session_state.get("agent")
+        if a is not None:
+            mon["steps"] = sum(len(t.steps)
+                                for ts in a.trajectories.values() for t in ts)
+            mon["state"] = a.state
+        import time as _t
+        _t.sleep(2)
+        st.rerun()
+
+_run_with_progress = None  # 改名后的兼容标记
+
+# 运行监控卡片（点击开始后出现，实时显示，不打断其他标签页浏览）
+if st.session_state.get("monitor") is not None:
+    mon = st.session_state["monitor"]
+    if mon.get("running") or mon.get("just_done"):
+        _c1, _c2, _c3 = st.columns([2.2, 1.2, 1])
+        with _c1:
+            _stage = {"RUNNING": "多轮对话测试", "EVALUATING": "独立评审",
+                      "REPORTING": "生成报告", "PLANNING": "制定方案"}.get(
+                mon.get("state", ""), mon.get("state", ""))
+            _cls = "live" if mon.get("running") else "on"
+            st.markdown(
+                "<span class='sl-pill {}'>{} {}</span>"
+                "<span class='sl-meta'>{} · 已完成 {} / {} 轮对话</span>".format(
+                    _cls, "● 检测运行中" if mon.get("running") else "✓ 体检完成",
+                    _stage, mon.get("note", ""), mon.get("steps", 0),
+                    mon.get("total", 0)), unsafe_allow_html=True)
+        with _c2:
+            st.progress(min(1.0, mon.get("steps", 0) / max(1, mon.get("total", 1))))
+        with _c3:
+            if mon.get("running"):
+                st.caption("可继续浏览其他标签页，运行不受影响")
+        if not mon.get("running"):
+            st.session_state["monitor"] = None  # 完成横幅显示一次后清除
+
+tab0, tab1, tab2, tab4, tab5 = st.tabs([
+    "总览", "实况演示", "轨迹回放", "风险发现", "评估报告"])
 
 # ============================================================ Tab 0 总览
 with tab0:
@@ -198,43 +248,44 @@ with tab0:
                  icon="📄")
         st.rerun()
 
-    def _run_with_progress(a, expected_steps, est_text):
-        """后台线程跑 agent，前台轮询步数实时刷进度条。"""
+    def _run_in_background(a, expected_steps, est_text):
+        """点击开始后：启动后台线程 + 自动刷新监控卡片，用户可继续浏览各标签页。"""
         import threading
-        import time as _time
-        done = {"ok": False, "err": None}
+
+        if st.session_state.get("_run_thread") is not None and \
+                st.session_state["_run_thread"].is_alive():
+            st.toast("已有一次检测在运行中，请等待完成", icon="⏳")
+            return
+
+        st.session_state["monitor"] = {"running": True, "state": "PLANNING",
+                                       "steps": 0, "total": expected_steps,
+                                       "note": est_text}
+        st.session_state.agent = a
 
         def _work():
             try:
                 a.run()
-                done["ok"] = True
+                st.session_state["monitor"] = {
+                    "running": False, "just_done": True, "state": "COMPLETED",
+                    "steps": expected_steps, "total": expected_steps,
+                    "note": "报告已生成"}
+                n_risk = a.report["overview"]["risk_tasks"] if a.report else 0
+                st.toast("体检完成：{} 个场景中发现 {} 个风险，"
+                         "请查看「评估报告」".format(
+                             a.report["overview"]["total_tasks"] if a.report else 0,
+                             n_risk), icon="✅")
             except Exception as exc:  # noqa: BLE001
-                done["err"] = str(exc)
+                st.session_state["monitor"] = {
+                    "running": False, "just_done": True, "state": "FAILED",
+                    "steps": 0, "total": expected_steps,
+                    "note": str(exc)[:80]}
+                st.toast("运行出错：{}".format(str(exc)[:100]), icon="❌")
+
         th = threading.Thread(target=_work, daemon=True)
+        st.session_state["_run_thread"] = th
         th.start()
-        pr = st.progress(0.05, "正在加载模型并运行检测（{}）…".format(est_text))
-        while th.is_alive():
-            _time.sleep(2)
-            n = sum(len(t.steps) for ts in a.trajectories.values() for t in ts)
-            pr.progress(min(0.95, 0.05 + 0.9 * n / max(1, expected_steps)),
-                        "已完成 {} / {} 轮对话 · 当前阶段 {}".format(
-                            n, expected_steps,
-                            {"RUNNING": "多轮测试", "EVALUATING": "独立评审",
-                             "REPORTING": "生成报告"}.get(a.state, a.state)))
-        th.join()
-        if done["err"]:
-            pr.empty()
-            st.error("运行出错：{}。可减少场景数重试，或先用示例数据体验。".format(
-                done["err"][:220]))
-            st.session_state.agent = None
-        else:
-            pr.progress(1.0, "体检完成")
-            n_risk = a.report["overview"]["risk_tasks"] if a.report else 0
-            st.toast("体检完成：{} 个场景中发现 {} 个风险。"
-                     "请查看「评估报告」与「轨迹回放」".format(
-                         a.report["overview"]["total_tasks"] if a.report else 0,
-                         n_risk), icon="✅")
-            st.rerun()  # 刷新后各标签页读取本次运行数据
+        st.toast("体检已在后台启动（{}）——顶部监控卡片显示进度，"
+                 "你可以继续浏览其他标签页".format(est_text), icon="🚀")
 
     if start:
         from safeloop.agents.main_agent import SafeLoopMainAgent
@@ -249,7 +300,7 @@ with tab0:
             a.submit("检测本地模型 Phi-3.5 的安全风险", mode=m,
                      max_tasks=int(max_tasks), budget_per_task=3)
             st.session_state.agent = a
-            _run_with_progress(a, int(max_tasks) * 3 * n_branch, est)
+            _run_in_background(a, int(max_tasks) * 3 * n_branch, est)
         else:
             ok = st.session_state.conn_result or {}
             if not ok.get("ok"):
@@ -265,7 +316,7 @@ with tab0:
                                      "model": ok["model"],
                                      "api_key_env": api_env.strip()})
                 st.session_state.agent = a
-                _run_with_progress(a, int(max_tasks) * 3 * n_branch, est)
+                _run_in_background(a, int(max_tasks) * 3 * n_branch, est)
 
 # ============================================================ 数据准备
 pool = []
@@ -294,14 +345,8 @@ with tab1:
         _pcol, _acol = st.columns([2.4, 1])
         with _acol:
             if st.button("自动播放（逐轮推进）", use_container_width=True):
-                import time as _time
-                ph = st.empty()
-                for step_i in range(1, len(nodes) + 1):
-                    ph.progress(step_i / len(nodes),
-                                "第 {} / {} 轮".format(step_i, len(nodes)))
-                    st.session_state.live_step = step_i
-                    _time.sleep(1.6)
-                ph.empty()
+                _cur = st.session_state.get("live_step", len(nodes))
+                st.session_state["autoplay_left"] = len(nodes) - _cur
                 st.rerun()
         # 阶段滑块 = 事件推进（决策树逐轮点亮的演示形态）
         max_step = st.slider("演示进度（逐轮推进）", 1, len(nodes),
@@ -362,22 +407,17 @@ with tab1:
                             .replace("<", "&lt;")))
             st.markdown("".join(blocks), unsafe_allow_html=True)
         with c3:
-            st.markdown("**实况决策树**")
-            shown = []
-            for i, nd in enumerate(nodes[:max_step]):
-                nd2 = dict(nd)
-                nd2["state"] = ("red" if i == max_step - 1 and max_step < len(nodes)
-                                else "decided")
-                shown.append(nd2)
+            st.markdown("**决策树**（完整路径先展示，已完成的决策点亮并流动）")
             demo_trig = next((s.round_id + 1 for s in demo.steps if _ok(s)), None)
             st.markdown(decision_path_tree(
-                shown, verdict=None if max_step < len(nodes) else
+                nodes, verdict=None if max_step < len(nodes) else
                 ("风险确认" if any(_ok(s) for s in demo.steps) else "抵御成功"),
-                live=True, trigger_round=(demo_trig if demo_trig and
-                                          demo_trig <= max_step else None)),
+                live=True, progress=max_step,
+                trigger_round=(demo_trig if demo_trig and
+                               demo_trig <= max_step else None)),
                 unsafe_allow_html=True)
-            st.caption("节点色 = 裁判信号（红 推进显著 / 黄 部分推进 / 绿 未推进），"
-                       "边上的词 = 控制器决策。")
+            st.caption("灰暗部分 = 尚未进行的决策；点亮节点 = 已完成轮次（红/黄/绿 = "
+                       "裁判信号），发光流动的连线 = 已执行的决策动作。")
 
 # ============================================================ Tab 2 轨迹回放
 with tab2:
@@ -425,29 +465,6 @@ with tab2:
                         len(traj.steps)) if final_ok
                        else "抵御成功：全部 {} 轮未出现风险回答。".format(len(traj.steps)))))
         st.markdown("".join(blocks), unsafe_allow_html=True)
-
-# ============================================================ Tab 3 决策树
-with tab3:
-    st.markdown("##### 单任务决策路径")
-    st.caption("为什么每一轮这样决策：节点是轮次（策略与裁判信号），边是控制器动作。"
-               "红色代表该轮推进显著，绿色代表未推进。")
-    if not pool:
-        st.info("暂无数据。")
-    else:
-        sel3 = st.selectbox("选择场景", [scenario_label(t, expert) for t in pool[:40]],
-                            key="tree_sel")
-        traj3 = pool[[scenario_label(t, expert) for t in pool[:40]].index(sel3)]
-        nodes3 = trajectory_to_nodes(traj3)
-        verdict3 = ("风险确认" if any(_ok(s) for s in traj3.steps) else "抵御成功")
-        trig3 = next((s.round_id + 1 for s in traj3.steps if _ok(s)), None)
-        if trig3 and trig3 > 1:
-            st.info("转变型场景：第 1 轮未触发，第 {} 轮首次触发——"
-                    "多轮测试暴露了单轮检测看不到的风险。".format(trig3))
-        st.markdown("<div class='sl-card'>{}</div>".format(
-            decision_path_tree(nodes3, verdict=verdict3, trigger_round=trig3)),
-            unsafe_allow_html=True)
-        st.caption("转变型场景（首轮安全，后续触发）的触发轮节点带红点标记——"
-                   "这是多轮体检价值的直接证据。")
 
 # ============================================================ Tab 4 风险发现
 with tab4:

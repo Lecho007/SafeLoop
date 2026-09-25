@@ -89,10 +89,13 @@ def system_routing_tree(active_domain: Optional[str] = None,
 # ============================================================ 单任务决策路径树
 def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = None,
                        live: bool = False,
-                       trigger_round: Optional[int] = None) -> str:
+                       trigger_round: Optional[int] = None,
+                       progress: Optional[int] = None) -> str:
     """逐轮决策路径：节点=轮次（策略+信号色），边=决策动作。
 
     rounds: tree_model 产出的节点列表；live=True 时给活跃节点加脉冲。
+    progress（演示模式）：先渲染完整骨架（暗色），已完成的前 progress 个节点
+    及其之间的边点亮——已完成的边带流动光效，表示决策走到了哪里。
     """
     if not rounds:
         return ("<div style='color:#67738a;padding:20px;text-align:center'>"
@@ -105,20 +108,33 @@ def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = No
              '<feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="{}"/>'
              '</filter></defs>'.format(LENS),
              '<style>.dn{fill:%s;stroke:%s;stroke-width:1.5}'
+             '.dn.done{fill:%s;stroke:%s;stroke-width:2}'
              '.dt{font-size:13px;font-weight:600;fill:#172033}'
              '.ds{font-size:11px;fill:#67738a}'
              '.de{stroke:%s;stroke-width:2;fill:none}'
-             '.dl{font-size:12px;font-weight:600;fill:%s}</style>'
-             % (PANEL, TRACE, TRACE, LENS)]
+             '.de.done{stroke:%s;stroke-width:2.4;'
+             'stroke-dasharray:6 12;animation:deflow 1s linear infinite;'
+             'filter:drop-shadow(0 0 4px rgba(47,111,235,.5))}'
+             '@keyframes deflow{to{stroke-dashoffset:-18}}'
+             '.dl{font-size:12px;font-weight:600;fill:%s}'
+             '.dl.dim{fill:#9db0c4}</style>'
+             % (PANEL, TRACE, "#eef5ff", LENS, "#c9d6e6", LENS, LENS)]
     for i, nd in enumerate(rounds):
         cx = 70 + int(gap * i)
         sig = SIGNAL_HEX.get(nd.get("signal"))
         state = nd.get("state", "decided")
-        stroke = sig if state in ("judged", "decided") else TRACE
+        done = (progress is not None and i < progress)
+        stroke = sig if (done or state in ("judged", "decided")
+                         and progress is None) else TRACE
+        if progress is not None and not done:
+            stroke = "#c9d6e6"
         active = ' filter="url(#dglow)"' if (live and state in ("red",) and
                                             i == len(rounds) - 1) else ""
-        parts.append('<circle cx="{}" cy="70" r="30" fill="{}" stroke="{}" '
-                     'stroke-width="2.4" {}/>'.format(cx, PANEL, stroke, active))
+        node_cls = ' class="dn done"' if done else ' class="dn"'
+        parts.append('<circle cx="{}" cy="70" r="30" {} fill="{}" stroke="{}" '
+                     'stroke-width="2.4" {}/>'.format(
+                         cx, node_cls, "#eef5ff" if done else PANEL,
+                         stroke, active))
         if nd.get("signal"):
             parts.append('<circle cx="{}" cy="70" r="8" fill="{}"/>'
                          .format(cx, sig))
@@ -143,10 +159,13 @@ def decision_path_tree(rounds: List[Dict[str, Any]], verdict: Optional[str] = No
             act = nd["action"]
             zh = ACTION_ZH.get(act, act)
             x1, x2 = cx + 32, cx + int(gap) - 32
-            parts.append('<path class="de" d="M{} 70 L {} 70" marker-end="url(#dar)"/>'
-                         .format(x1, x2))
-            parts.append('<text x="{}" y="60" text-anchor="middle" class="dl">{}</text>'
-                         .format((x1 + x2) // 2, zh))
+            edge_done = (progress is not None and i + 1 < progress)
+            ecls = "de done" if edge_done else ("de" if progress is None else "de")
+            parts.append('<path class="{}" d="M{} 70 L {} 70"/>'
+                         .format(ecls, x1, x2))
+            lcls = "dl dim" if (progress is not None and not edge_done) else "dl"
+            parts.append('<text x="{}" y="60" text-anchor="middle" class="{}">{}</text>'
+                         .format((x1 + x2) // 2, lcls, zh))
     if verdict:
         vc = RISK if "风险" in verdict else SAFE
         parts.append('<rect x="{}" y="185" width="150" height="34" rx="17" fill="{}" '
