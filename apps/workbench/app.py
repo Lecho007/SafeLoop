@@ -256,9 +256,17 @@ with tab0:
     with bB:
         sample = st.button("载入示例数据（即时）", use_container_width=True)
     with bC:
-        st.markdown("<div style='height:9px'></div>", unsafe_allow_html=True)
+        # 垂直居中（与按钮中线对齐）：占满列高 + flex 居中
+        st.markdown(
+            "<style>div[data-testid='column'] > div:first-child,"
+            "div[data-testid='stVerticalBlock']{height:100%}</style>",
+            unsafe_allow_html=True)
         max_tasks = st.number_input("场景数量（现场跑）", 2, 10, 3,
                                     label_visibility="collapsed")
+        st.markdown(
+            "<style>div[data-testid='stNumberInput']{display:flex;"
+            "align-items:center;height:100%;min-height:52px}</style>",
+            unsafe_allow_html=True)
     st.caption("现场跑 = 本机真实运行多智能体检测（加载 4 个模型，标准/引导约 6-10 分钟，"
                "对比约 12-20 分钟，请保持本页打开）。示例数据 = 1B-R 真实研究产物，秒级。")
     if sample:
