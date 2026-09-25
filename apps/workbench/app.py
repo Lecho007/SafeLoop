@@ -380,7 +380,8 @@ with tab0:
                             st=STRATEGY_ZH.get(e["strategy"], e["strategy"]), j=jt,
                             q=str(e["prompt"])[:240].replace("&", "&amp;").replace("<", "&lt;"),
                             a=str(e["response"])[:360].replace("&", "&amp;").replace("<", "&lt;")))
-            st.markdown("".join(blocks), unsafe_allow_html=True)
+            st.markdown("<div style='max-height:420px;overflow-y:auto;padding-right:8px'>" + "".join(blocks) + "</div>",
+                unsafe_allow_html=True)
         with _d3:
             st.markdown("**决策树**（已完成的决策点亮并流动）")
             from tree_model import SIGNAL_OF_ADVANCEMENT
@@ -452,7 +453,8 @@ with tab0:
                                 j=jt,
                                 q=s.action.prompt[:260].replace("&", "&amp;").replace("<", "&lt;"),
                                 a=s.response.text[:380].replace("&", "&amp;").replace("<", "&lt;")))
-                st.markdown("".join(blocks), unsafe_allow_html=True)
+                st.markdown("<div style='max-height:420px;overflow-y:auto;padding-right:8px'>" + "".join(blocks) + "</div>",
+                    unsafe_allow_html=True)
             with _c3:
                 st.markdown("**决策树**（完整路径先展示，已完成的决策点亮并流动）")
                 demo_trig = next((s.round_id + 1 for s in demo.steps if _ok(s)), None)
