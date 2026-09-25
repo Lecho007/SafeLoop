@@ -109,6 +109,15 @@ def _ok(s):
     return bool(s.external_evaluation and s.external_evaluation.success)
 
 
+# ============================================================ 数据准备
+pool = []
+report = None
+if agent is not None:
+    report = agent.report
+    pool = (agent.trajectories.get("STD")
+            or next(iter(agent.trajectories.values()), []))
+
+
 agent = get_agent()
 
 
@@ -439,13 +448,6 @@ with tab0:
                                    demo_trig <= max_step else None)),
                     unsafe_allow_html=True)
 
-# ============================================================ 数据准备
-pool = []
-report = None
-if agent is not None:
-    report = agent.report
-    pool = (agent.trajectories.get("STD")
-            or next(iter(agent.trajectories.values()), []))
 
 
 # ============================================================ Tab 2 轨迹回放
