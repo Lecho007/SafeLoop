@@ -291,7 +291,8 @@ with tab0:
 
     if start:
         from safeloop.agents.main_agent import SafeLoopMainAgent
-        m = {"标准": "standard", "智能引导": "guided", "对比": "compare"}[mode[:4]]
+        m = ("guided" if mode.startswith("智能引导") else
+             "compare" if mode.startswith("对比") else "standard")
         n_branch = 2 if m == "compare" else 1
         est = {"standard": "约 6-10 分钟", "guided": "约 6-10 分钟",
                "compare": "约 12-20 分钟"}[m]
