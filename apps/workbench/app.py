@@ -106,22 +106,8 @@ def get_agent():
 
 
 agent = get_agent()
-_poll_monitor()
 
-# ============================================================ 页头
-t, e = st.columns([6, 1])
-with t:
-    st.markdown(
-        "<h1 style='margin:0;font-weight:300;font-size:34px'>SafeLoop "
-        "<b style='font-weight:700'>安全体检</b></h1>"
-        "<p class='sl-sub'>多智能体闭环安全评估 —— 让 AI 智能体替你测试你的大模型</p>",
-        unsafe_allow_html=True)
-with e:
-    st.markdown("<div style='height:34px'></div>", unsafe_allow_html=True)
-    expert = st.toggle("专家模式", value=False,
-                       help="显示研究指标、分支代号与原始任务编号")
 
-# 运行中自动轮询刷新（监控卡片 + 数据就绪即更新）
 def _poll_monitor():
     left = st.session_state.get("autoplay_left", 0)
     if left > 0:
@@ -146,6 +132,22 @@ def _poll_monitor():
 
 _run_with_progress = None  # 改名后的兼容标记
 
+_poll_monitor()
+
+# ============================================================ 页头
+t, e = st.columns([6, 1])
+with t:
+    st.markdown(
+        "<h1 style='margin:0;font-weight:300;font-size:34px'>SafeLoop "
+        "<b style='font-weight:700'>安全体检</b></h1>"
+        "<p class='sl-sub'>多智能体闭环安全评估 —— 让 AI 智能体替你测试你的大模型</p>",
+        unsafe_allow_html=True)
+with e:
+    st.markdown("<div style='height:34px'></div>", unsafe_allow_html=True)
+    expert = st.toggle("专家模式", value=False,
+                       help="显示研究指标、分支代号与原始任务编号")
+
+# 运行中自动轮询刷新（监控卡片 + 数据就绪即更新）
 # 运行监控卡片（点击开始后出现，实时显示，不打断其他标签页浏览）
 if st.session_state.get("monitor") is not None:
     mon = st.session_state["monitor"]
