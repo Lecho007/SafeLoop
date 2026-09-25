@@ -1,0 +1,67 @@
+<div style="background:var(--panel);border:1px solid var(--trace);
+     border-radius:10px;padding:20px 14px 8px;margin:6px 0 10px">
+<style>
+.hd-svg text{font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+.hd-n{fill:#15293C;stroke:#3A6478;stroke-width:1.4}
+.hd-core{fill:#173240;stroke:#56D8E8;stroke-width:2}
+.hd-t{font-size:14.5px;font-weight:600;fill:#D8E8F0}
+.hd-s{font-size:10.5px;fill:#7E9AB0}
+.hd-e{fill:none;stroke:#24455C;stroke-width:2}
+.hd-flow{fill:none;stroke:#56D8E8;stroke-width:2.6;stroke-linecap:round;
+  stroke-dasharray:6 16;opacity:0;
+  filter:drop-shadow(0 0 5px #2E9FB8);
+  animation:hdflow 1.1s linear infinite, hdrelay 4.2s infinite}
+@keyframes hdflow{to{stroke-dashoffset:-22}}
+@keyframes hdrelay{0%{opacity:0}4%{opacity:1}16%{opacity:1}
+  24%{opacity:0}100%{opacity:0}}
+.hd-pulse{animation:hdpulse 4.2s infinite}
+@keyframes hdpulse{0%,14%,100%{filter:none}
+  5%,11%{filter:drop-shadow(0 0 8px #56D8E8)}}
+</style>
+<svg viewBox="0 0 860 430" width="100%" class="hd-svg">
+  <path class="hd-e" d="M430 58 V 96"/>
+  <path class="hd-e" d="M430 150 L 190 200"/><path class="hd-e" d="M430 150 L 430 200"/>
+  <path class="hd-e" d="M430 150 L 670 200"/>
+  <path class="hd-e" d="M190 254 L 190 300 L 330 330"/>
+  <path class="hd-e" d="M470 344 L 620 300 L 668 258"/>
+  <path class="hd-e" d="M520 330 L 655 330 L 682 258"/>
+  <path class="hd-flow" style="animation-delay:0s,0s"     d="M430 58 V 96"/>
+  <path class="hd-flow" style="animation-delay:0s,.45s"   d="M430 150 L 190 200"/>
+  <path class="hd-flow" style="animation-delay:0s,.45s"   d="M430 150 L 430 200"/>
+  <path class="hd-flow" style="animation-delay:0s,.45s"   d="M430 150 L 670 200"/>
+  <path class="hd-flow" style="animation-delay:0s,.9s"    d="M190 254 L 190 300 L 330 330"/>
+  <path class="hd-flow" style="animation-delay:0s,1.5s"   d="M470 344 L 620 300 L 668 258"/>
+  <path class="hd-flow" style="animation-delay:0s,2.2s"   d="M520 330 L 655 330 L 682 258"/>
+  <g class="hd-pulse" style="animation-delay:0s"><circle cx="430" cy="36" r="16"
+     fill="#173240" stroke="#56D8E8" stroke-width="1.6"/>
+    <text x="430" y="41" text-anchor="middle" style="font-size:14px">👤</text></g>
+  <text x="458" y="33" class="hd-t">用户</text>
+  <rect class="hd-n hd-core hd-pulse" style="animation-delay:.45s"
+        x="320" y="98" width="220" height="52" rx="10"/>
+  <text x="430" y="120" text-anchor="middle" class="hd-t">🧠 SafeLoop 主智能体</text>
+  <text x="430" y="138" text-anchor="middle" class="hd-s">需求理解，规划与调度</text>
+  <rect class="hd-n hd-pulse" style="animation-delay:.45s" x="110" y="202"
+        width="160" height="52" rx="9"/>
+  <text x="190" y="224" text-anchor="middle" class="hd-t">🕵️ 红方测试员</text>
+  <text x="190" y="242" text-anchor="middle" class="hd-s">设计并逐轮调整测试问题</text>
+  <rect class="hd-n hd-pulse" style="animation-delay:1.5s" x="340" y="202"
+        width="180" height="52" rx="9"/>
+  <text x="430" y="224" text-anchor="middle" class="hd-t">🔍 安全判别智能体</text>
+  <text x="430" y="242" text-anchor="middle" class="hd-s">内容安全与目标推进双视角</text>
+  <rect class="hd-n hd-pulse" style="animation-delay:2.2s" x="590" y="202"
+        width="180" height="52" rx="9"/>
+  <text x="680" y="224" text-anchor="middle" class="hd-t">⚖️ 独立评审官</text>
+  <text x="680" y="242" text-anchor="middle" class="hd-s">不参与测试，只做最终裁决</text>
+  <rect class="hd-n hd-pulse" style="animation-delay:.9s" x="330" y="308"
+        width="200" height="52" rx="9" style="stroke:#8B7CF6"/>
+  <text x="430" y="330" text-anchor="middle" class="hd-t">🤖 被测大模型</text>
+  <text x="430" y="348" text-anchor="middle" class="hd-s">本地模型或在线API黑盒</text>
+  <rect x="110" y="386" width="660" height="30" rx="6" fill="#0B1826"
+        stroke="#24455C" stroke-dasharray="4 3"/>
+  <text x="440" y="405" text-anchor="middle" class="hd-s">
+    Skills 能力层：任务解析，智能路由，反馈生成，策略控制，模型调用，过程记录，指标统计，报告生成</text>
+</svg>
+<div style="text-align:center;color:#7E9AB0;font-size:12.5px;padding:4px 0 12px">
+  光流即工作流：用户需求 → 主智能体规划 → 红方测试员提问 → 被测模型回答 →
+  安全判别逐轮分析 → 完整记录交独立评审官裁决
+</div></div>
