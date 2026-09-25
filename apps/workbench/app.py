@@ -190,32 +190,82 @@ with tab0:
         sample = st.button("载入示例数据（即时）", use_container_width=True)
     with bC:
         max_tasks = st.number_input("场景数量（现场跑）", 2, 10, 3)
+    st.caption("现场跑 = 本机真实运行多智能体检测（加载 4 个模型，标准/引导约 6-10 分钟，"
+               "对比约 12-20 分钟，请保持本页打开）。示例数据 = 1B-R 真实研究产物，秒级。")
     if sample:
         st.session_state.agent = None
+        st.toast("已载入示例报告（真实研究数据）——查看「评估报告」「轨迹回放」标签页",
+                 icon="📄")
         st.rerun()
-    if start:
-        if "本地" in target_kind:
+
+    def _run_with_progress(a, expected_steps, est_text):
+        """后台线程跑 agent，前台轮询步数实时刷进度条。"""
+        import threading
+        import time as _time
+        done = {"ok": False, "err": None}
+
+        def _work():
+            try:
+                a.run()
+                done["ok"] = True
+            except Exception as exc:  # noqa: BLE001
+                done["err"] = str(exc)
+        th = threading.Thread(target=_work, daemon=True)
+        th.start()
+        pr = st.progress(0.05, "正在加载模型并运行检测（{}）…".format(est_text))
+        while th.is_alive():
+            _time.sleep(2)
+            n = sum(len(t.steps) for ts in a.trajectories.values() for t in ts)
+            pr.progress(min(0.95, 0.05 + 0.9 * n / max(1, expected_steps)),
+                        "已完成 {} / {} 轮对话 · 当前阶段 {}".format(
+                            n, expected_steps,
+                            {"RUNNING": "多轮测试", "EVALUATING": "独立评审",
+                             "REPORTING": "生成报告"}.get(a.state, a.state)))
+        th.join()
+        if done["err"]:
+            pr.empty()
+            st.error("运行出错：{}。可减少场景数重试，或先用示例数据体验。".format(
+                done["err"][:220]))
             st.session_state.agent = None
-            st.rerun()
+        else:
+            pr.progress(1.0, "体检完成")
+            n_risk = a.report["overview"]["risk_tasks"] if a.report else 0
+            st.toast("体检完成：{} 个场景中发现 {} 个风险。"
+                     "请查看「评估报告」与「轨迹回放」".format(
+                         a.report["overview"]["total_tasks"] if a.report else 0,
+                         n_risk), icon="✅")
+            st.rerun()  # 刷新后各标签页读取本次运行数据
+
+    if start:
+        from safeloop.agents.main_agent import SafeLoopMainAgent
+        m = {"标准": "standard", "智能引导": "guided", "对比": "compare"}[mode[:4]]
+        n_branch = 2 if m == "compare" else 1
+        est = {"standard": "约 6-10 分钟", "guided": "约 6-10 分钟",
+               "compare": "约 12-20 分钟"}[m]
+        if "本地" in target_kind:
+            st.toast("体检已开始：{} 个场景 × 每场景 3 轮，{}。正在加载模型…".format(
+                int(max_tasks), est), icon="🚀")
+            a = SafeLoopMainAgent()
+            a.submit("检测本地模型 Phi-3.5 的安全风险", mode=m,
+                     max_tasks=int(max_tasks), budget_per_task=3)
+            st.session_state.agent = a
+            _run_with_progress(a, int(max_tasks) * 3 * n_branch, est)
         else:
             ok = st.session_state.conn_result or {}
             if not ok.get("ok"):
                 st.error("请先完成测试连接，再开始 API 模型检测。")
             else:
-                from safeloop.agents.main_agent import SafeLoopMainAgent
-                m = {"标准": "standard", "智能引导": "guided", "对比": "compare"}[
-                    mode[:4]]
+                st.toast("API 模型体检已开始（{} 个场景，{}）".format(
+                    int(max_tasks), est), icon="🚀")
                 a = SafeLoopMainAgent()
-                a.submit("检测 API 模型安全风险", mode=m, max_tasks=max_tasks,
-                         budget_per_task=3, api_target={
-                             "provider": ok["provider"],
-                             "base_url": api_base.strip(),
-                             "model": ok["model"], "api_key_env": api_env.strip()})
+                a.submit("检测 API 模型安全风险", mode=m,
+                         max_tasks=int(max_tasks), budget_per_task=3,
+                         api_target={"provider": ok["provider"],
+                                     "base_url": api_base.strip(),
+                                     "model": ok["model"],
+                                     "api_key_env": api_env.strip()})
                 st.session_state.agent = a
-                pr = st.progress(0.0, "检测运行中")
-                a.run()
-                pr.progress(1.0, "完成")
-                st.rerun()
+                _run_with_progress(a, int(max_tasks) * 3 * n_branch, est)
 
 # ============================================================ 数据准备
 pool = []
