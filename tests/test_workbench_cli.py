@@ -19,11 +19,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
 import workbench_cli as wc
 
 
-def _mk_step(rid, strategy, advancement=None, safety=None, ok=None):
+def _mk_step(rid, strategy, advancement=None, safety=None, ok=None, text="a"):
     return NS(round_id=rid, action=NS(strategy=strategy),
               judge_output=NS(metadata={"advancement": advancement,
                                         "safety": safety}, outcome=None),
-              external_evaluation=NS(success=ok) if ok is not None else None)
+              external_evaluation=NS(success=ok) if ok is not None else None,
+              response=NS(text=text))
 
 
 def _mk_traj(tid, cat, steps):
@@ -153,6 +154,58 @@ class TestReportText(unittest.TestCase):
                                     "任务: B | y（第1轮触发）", "  R1 ..."])
         self.assertEqual(len(blocks), 2)
         self.assertEqual(blocks[1][0], "任务: B | y（第1轮触发）")
+
+
+class TestEmptyAnswerMarker(unittest.TestCase):
+    def test_count_empty_answers(self):
+        trajs = [_mk_traj("T1", "Privacy", [
+            _mk_step(0, "direct", text=""),
+            _mk_step(1, "roleplay", text="   "),
+            _mk_step(2, "direct", text="answer")])]
+        self.assertEqual(wc.count_empty_answers(trajs), 2)
+        self.assertEqual(wc.count_empty_answers([]), 0)
+
+    def test_live_frame_marks_empty_answer(self):
+        agent = NS(live_events=[{"branch": "STD", "round": 1, "strategy": "direct",
+                                 "prompt": "q", "response": "", "advancement": None,
+                                 "safety": "Unsafe", "success": False}],
+                   state="RUNNING")
+        buf = io.StringIO()
+        console = wc.Console(file=buf, width=80)
+        console.print(wc.live_frame(agent, 9, 0.0))
+        self.assertIn("（空回答）", buf.getvalue())
+
+
+class TestApiTargetParse(unittest.TestCase):
+    """api_target._parse 契约：(text, usage, finish_reason)；默认预算已提高。"""
+
+    def test_openai_chat_empty_content_keeps_finish_reason(self):
+        from targets.api_target import OpenAIChatTarget
+        t = OpenAIChatTarget({"base_url": "https://x/v1", "model": "m"})
+        text, usage, finish = t._parse({
+            "choices": [{"message": {"content": "", "reasoning_content": "th"},
+                         "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 512}})
+        self.assertEqual(text, "")
+        self.assertEqual(finish, "length")
+        self.assertEqual(usage["output_tokens"], 512)
+
+    def test_default_budget_raised_for_reasoning_models(self):
+        from targets.api_target import OpenAIChatTarget
+        t = OpenAIChatTarget({"base_url": "https://x/v1", "model": "m"})
+        self.assertGreaterEqual(t.gen["max_tokens"], 4096)
+
+    def test_anthropic_and_responses_parse(self):
+        from targets.api_target import AnthropicTarget, OpenAIResponsesTarget
+        a = AnthropicTarget({"base_url": "https://x", "model": "m"})
+        text, _, finish = a._parse({"content": [{"type": "text", "text": "hi"}],
+                                    "stop_reason": "end_turn",
+                                    "usage": {"input_tokens": 1, "output_tokens": 2}})
+        self.assertEqual((text, finish), ("hi", "end_turn"))
+        r = OpenAIResponsesTarget({"base_url": "https://x", "model": "m"})
+        text, _, finish = r._parse({"output_text": "ok", "status": "completed",
+                                    "usage": {}})
+        self.assertEqual((text, finish), ("ok", "completed"))
 
 
 class TestProgress(unittest.TestCase):

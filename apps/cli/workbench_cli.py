@@ -75,6 +75,19 @@ def _clip(text: Optional[str], limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+EMPTY_ANSWER = "（空回答）"
+
+
+def count_empty_answers(trajectories) -> int:
+    """回答文本为空的轮数——推理型模型回答预算耗尽/上游拦截的信号。"""
+    n = 0
+    for t in trajectories or []:
+        for s in getattr(t, "steps", []) or []:
+            if not (getattr(getattr(s, "response", None), "text", None) or "").strip():
+                n += 1
+    return n
+
+
 def _step_ok(s) -> bool:
     ev = getattr(s, "external_evaluation", None)
     return bool(ev and getattr(ev, "success", False))
@@ -289,7 +302,8 @@ def live_frame(agent, total: int, t0: float, recent: int = 8, multi_branch: bool
         grid.add_row(Text.assemble(("● ", dot_color(ev)),
                                    (tag + round_line(ev), "bold")))
         grid.add_row(Text("  问 " + _clip(ev.get("prompt"), PROMPT_CLIP), "dim"))
-        grid.add_row(Text("  答 " + _clip(ev.get("response"), RESPONSE_CLIP), "dim"))
+        ans = _clip(ev.get("response"), RESPONSE_CLIP)
+        grid.add_row(Text("  答 " + (ans or EMPTY_ANSWER), "dim"))
     return Panel(grid, title="SafeLoop 运行中（Ctrl+C 中断）",
                  border_style="cyan", expand=False)
 
@@ -315,7 +329,8 @@ def run_with_live(agent, total: int, console: "Console", plain: bool) -> int:
                 for ev in agent.live_events[seen:]:
                     console.print("● " + round_line(ev))
                     console.print("  问 " + _clip(ev.get("prompt"), PROMPT_CLIP))
-                    console.print("  答 " + _clip(ev.get("response"), RESPONSE_CLIP))
+                    ans = _clip(ev.get("response"), RESPONSE_CLIP)
+                    console.print("  答 " + (ans or EMPTY_ANSWER))
                 seen = len(agent.live_events)
         else:
             with Live(console=console, refresh_per_second=2) as live:
@@ -448,6 +463,14 @@ def run_flow(console: "Console", args) -> int:
     render_report(console, agent.report, detail_lines=detail_lines,
                   report_path="outputs/reports/{}_report.json".format(agent.run_id),
                   primary_note="STD 分支" if (mode == "compare" and trajs) else None)
+    if trajs:
+        n_empty, n_rounds = count_empty_answers(trajs), sum(
+            len(t.steps) for t in trajs)
+        if n_empty:
+            console.print(
+                "[yellow]⚠ {}/{} 轮回答为空：被测端在该回答预算内没有产出内容"
+                "（截断或上游过滤），这些轮不计入风险，本次结论会低估风险，"
+                "建议调大回答预算后重跑。[/yellow]".format(n_empty, n_rounds))
     return 0
 
 

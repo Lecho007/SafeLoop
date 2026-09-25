@@ -23,7 +23,10 @@ from targets.base_target import BaseTarget
 
 PROVIDERS = ("openai_chat", "anthropic", "openai_responses")
 
-DEFAULTS = {"temperature": 0.7, "top_p": 1.0, "max_tokens": 512,
+DEFAULTS = {"temperature": 0.7, "top_p": 1.0,
+            # 推理型模型（deepseek-reasoner/flash 等）先输出思考链再给最终回答，
+            # 思考同样消耗 completion 预算：512 会把最终回答截成空（finish=length）
+            "max_tokens": 4096,
             "timeout": 60, "retries": 3}
 
 
@@ -97,7 +100,7 @@ class APITargetBase(BaseTarget):
         payload = self._build_payload(prompt)
         out = _HTTP.post_json(self._url(), headers, payload,
                               int(self.gen["timeout"]), int(self.gen["retries"]))
-        text, usage = self._parse(out)
+        text, usage, finish = self._parse(out)
         return TargetResponse(
             text=text, model_name=self.model_name,
             latency=time.time() - start,
@@ -105,7 +108,8 @@ class APITargetBase(BaseTarget):
             output_tokens=usage.get("output_tokens", len(text.split())),
             metadata={"backend": "api", "provider": self.provider,
                       "model": self.model, "base_url": self.base_url,
-                      "api_key_env": self.api_key_env})  # 只记变量名，不记 key
+                      "api_key_env": self.api_key_env,   # 只记变量名，不记 key
+                      "finish_reason": finish})
 
     def _url(self) -> str:
         raise NotImplementedError
@@ -144,10 +148,13 @@ class OpenAIChatTarget(APITargetBase):
                 "max_tokens": self.gen["max_tokens"]}
 
     def _parse(self, out):
-        text = out["choices"][0]["message"]["content"]
+        ch = out["choices"][0]
+        msg = ch.get("message") or {}
         u = out.get("usage", {}) or {}
-        return text, {"input_tokens": u.get("prompt_tokens", 0),
-                      "output_tokens": u.get("completion_tokens", 0)}
+        return (msg.get("content") or "",
+                {"input_tokens": u.get("prompt_tokens", 0),
+                 "output_tokens": u.get("completion_tokens", 0)},
+                ch.get("finish_reason"))
 
 
 class AnthropicTarget(APITargetBase):
@@ -171,8 +178,9 @@ class AnthropicTarget(APITargetBase):
         text = "".join(b.get("text", "") for b in blocks
                        if b.get("type") == "text")
         u = out.get("usage", {}) or {}
-        return text, {"input_tokens": u.get("input_tokens", 0),
-                      "output_tokens": u.get("output_tokens", 0)}
+        return (text, {"input_tokens": u.get("input_tokens", 0),
+                       "output_tokens": u.get("output_tokens", 0)},
+                out.get("stop_reason"))
 
 
 class OpenAIResponsesTarget(APITargetBase):
@@ -197,8 +205,9 @@ class OpenAIResponsesTarget(APITargetBase):
                     if c.get("type") in ("output_text", "text"):
                         text += c.get("text", "")
         u = out.get("usage", {}) or {}
-        return text, {"input_tokens": u.get("input_tokens", 0),
-                      "output_tokens": u.get("output_tokens", 0)}
+        return (text, {"input_tokens": u.get("input_tokens", 0),
+                       "output_tokens": u.get("output_tokens", 0)},
+                out.get("status"))
 
 
 _CLASSES = {"openai_chat": OpenAIChatTarget,

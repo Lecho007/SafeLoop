@@ -33,10 +33,12 @@ class TestPayloads(unittest.TestCase):
         p = t._build_payload("hello")
         self.assertEqual(p["messages"], [{"role": "user", "content": "hello"}])
         self.assertEqual(p["model"], "my-model")
-        text, u = t._parse({"choices": [{"message": {"content": "world"}}],
-                            "usage": {"prompt_tokens": 3, "completion_tokens": 2}})
+        text, u, finish = t._parse({"choices": [{"message": {"content": "world"},
+                                                 "finish_reason": "stop"}],
+                                    "usage": {"prompt_tokens": 3, "completion_tokens": 2}})
         self.assertEqual(text, "world")
         self.assertEqual(u, {"input_tokens": 3, "output_tokens": 2})
+        self.assertEqual(finish, "stop")
 
     def test_anthropic_payload_and_parse(self):
         t = AnthropicTarget(_cfg("anthropic"))
@@ -47,10 +49,12 @@ class TestPayloads(unittest.TestCase):
         p = t._build_payload("hello")
         self.assertNotIn("system", p)                    # system 独立参数，不进 messages
         self.assertEqual(p["messages"][0]["role"], "user")
-        text, _ = t._parse({"content": [{"type": "text", "text": "a"},
-                                        {"type": "text", "text": "b"}],
-                            "usage": {"input_tokens": 1, "output_tokens": 1}})
+        text, _, finish = t._parse({"content": [{"type": "text", "text": "a"},
+                                                {"type": "text", "text": "b"}],
+                                    "stop_reason": "end_turn",
+                                    "usage": {"input_tokens": 1, "output_tokens": 1}})
         self.assertEqual(text, "ab")
+        self.assertEqual(finish, "end_turn")
 
     def test_openai_responses_payload_and_parse(self):
         t = OpenAIResponsesTarget(_cfg("openai_responses"))
@@ -58,9 +62,10 @@ class TestPayloads(unittest.TestCase):
         p = t._build_payload("hello")
         self.assertEqual(p["input"], "hello")            # input 字段而非 messages
         self.assertIn("max_output_tokens", p)
-        text, _ = t._parse({"output": [{"content": [
-            {"type": "output_text", "text": "ok"}]}]})
+        text, _, finish = t._parse({"output": [{"content": [
+            {"type": "output_text", "text": "ok"}]}], "status": "completed"})
         self.assertEqual(text, "ok")
+        self.assertEqual(finish, "completed")
 
     def test_factory_by_provider(self):
         for provider, cls in (("openai_chat", OpenAIChatTarget),
