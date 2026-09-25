@@ -162,6 +162,24 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True nohup $PY scripts/run_stage1a.p
 # 中断后（断电/崩溃/手动停止）加 --resume 从最近完成轮次继续：
 #   $PY scripts/run_stage1a.py --config configs/hardware/rtx4060_8g_1ba.yaml --resume
 
+# ================= SafeLoop v1.0 作品层（2026-09-25，d72323c）=================
+# Workbench GUI（浏览器四页工作台：输入→多智能体运行视图→轨迹证据链→报告）
+PYTHONPATH=. $PY -m streamlit run apps/workbench/app.py --server.port 8510
+# 浏览器打开 http://localhost:8510 —— 默认回放 1B-R 预跑数据（秒级）；
+# 也可选"现场真跑（小子集）"。
+
+# API（FastAPI + SSE）
+PYTHONPATH=. $PY -m uvicorn apps.api.server:app --port 8712
+#   POST /replay                    —— 预跑数据装载为 run
+#   POST /evaluations               —— 新建评估（standard/guided/compare）
+#   GET  /evaluations/{id}/events   —— SSE 实时事件流
+#   GET  /evaluations/{id}/{report|trajectories|tasks}
+# 注：本机 curl 需 --noproxy '*'（系统代理会拦 127.0.0.1）
+
+# CLI
+PYTHONPATH=. python3 apps/cli/safeloop_cli.py report stage1b_r_4060   # 预跑报告
+PYTHONPATH=. $PY apps/cli/safeloop_cli.py evaluate --mode compare --max-tasks 4  # 现场小子集
+
 # Stage 1B-R 主实验（任务感知反馈路由：4 causal branches × 1000 queries，单夜跑）
 setsid nohup bash scripts/run_1br.sh > outputs/logs/stage1b_r.log 2>&1 < /dev/null &
 # 顺序：A(content·NONE)→B(content·ACTIVE)→C(goal·NONE)→D(goal·ACTIVE·CF-10)
