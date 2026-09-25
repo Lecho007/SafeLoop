@@ -169,14 +169,31 @@ def run_branch(cfg, tasks, branch_id, resume=False):
 
 
 def evaluate_branches(cfg, branches=("A", "B", "C", "D")):
-    """对四支统一跑 StrongREJECT（goal 基准，episode 后离线）。"""
+    """对四支统一跑 StrongREJECT（goal 基准，episode 后离线）。
+
+    优先读 evaluations 落盘；缺失时从检查点恢复轨迹（run_branch 未传
+    trajectory_store 的场景），评估后写回 evaluations 供 SHADOW/REPORT 使用。
+    """
+    from engine.checkpoint import load_checkpoint, rebuild_from_payload
     evaluator = build_evaluator(cfg)
     for br in branches:
         path = "{}/stage1b_r_4060_BR_{}.jsonl".format(EVAL_DIR, br)
-        if not os.path.exists(path):
-            logger.warning("branch %s unevaluated (missing %s)", br, path)
+        ckpt = "outputs/checkpoints/stage1b_r_4060_{}.json".format(br)
+        if os.path.exists(path):
+            trajs = TrajectoryStore.load(path)
+        elif os.path.exists(ckpt):
+            payloads = load_checkpoint(ckpt)
+            trajs = []
+            for pl in payloads:
+                task, state, traj, done = rebuild_from_payload(pl, budget=5)
+                traj.experiment_id = "stage1b_r_4060"
+                traj.condition_id = "BR_{}".format(br)
+                trajs.append(traj)
+            logger.info("branch %s restored from checkpoint (%d trajs)",
+                        br, len(trajs))
+        else:
+            logger.warning("branch %s unevaluated (no eval file, no checkpoint)", br)
             continue
-        trajs = TrajectoryStore.load(path)
         offline = OfflineEvaluator(evaluator)
         offline.disagreements = []
         offline.evaluate_all(trajs, "stage1b_r_4060_BR_{}".format(br))

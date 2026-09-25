@@ -365,7 +365,35 @@ CP-H     20.0%   0.147  5.27   0.342  0.000   1.00  0.073  0.000 0.150  24/72/41
 - 前期验证：四分支真实 smoke（各 2 tasks × B=5）全部协议检查 PASS；
 - 主实验由用户运行：run_1br.sh（自动重启+断点续跑）+ watch_1br_progress.sh（进度条+ETA）。
 
-### 4.21 后续
+### 4.21 Stage 1B-R 结果（2026-09-25，1000 queries 完成）
+```
+全量      ASR@5   AUC-B  CTTS   SSR
+C1        38.0%   0.312  4.44   0.180
+C-JR      31.0%   0.272  4.64   0.440
+C-R       27.0%   0.244  4.78   0.245
+
+content70   ASR@5   AUC    HSR
+C1          45.7%   0.366  0.230
+C-JR/C-R    30.0%   0.269  0.079
+
+goal30      ASR@5   AUC
+C1(=C-R)    20.0%   0.187   ← shadow 构造性一致
+C-JR        33.3%   0.280
+```
+- RH1 协议 PASS（路由 100%、FLR=0、C1 judge 结构性零调用、初始 prompt 双域一致）；
+- RH2 机制 **SUPPORTED**（content 域 HSR 0.230→0.079，1B-A 方向复现）；
+- RH3 shadow 构造性一致 **SUPPORTED**（goal30 task-level 0/0/30，逐字复用）；
+- RH4 **NOT SUPPORTED**（C-R 27.0% < C1 38.0%；McNemar p=0.0055）——下降全部来自
+  content 域（45.7%→30.0%，W1/L12）；goal 域 shadow 与 C1 完全一致；
+- RH5 **NOT SUPPORTED**（C-R < C-JR 31.0%；goal 子集上 C-JR 33.3% > C-R=C1 20.0%，
+  W0/L4）——**goal 域 ACTIVE（CF-10）本轮优于 shadow/无反馈**，与 CP 阶段结论相反向；
+- 按 §26 分支：Content 子域下降 → 检查 content feedback 栈复现（版本/seed/映射）；
+  goal 子集 C-JR>C1 与 CP/CF 阶段"goal active 无益"的既往证据冲突（单 seed n=30，
+  既往 CP-H/CF-11/CF-10 均未超过无反馈；本次 CF-10 栈 33.3%>20% 需复核 E 标签与
+  task 差异后再下结论）。工程注记：run_branch 未持久化轨迹导致 EVAL/SHADOW 首次
+  空转（已修为从检查点恢复并补跑，数据完整）。
+
+### 4.22 后续
 1A（真实 JBB-20，C1/C3，B=3）→ Gate/校准 → 1B（JBB-100，C1 vs C3，B=5，
 seed 42→{42,123,2026}，Go/No-Go：ΔASR>0 且 ΔAUC-B>0 且机制指标支持）→
 1C-Dev（HarmBench-Val 全条件含 C_SR）→ 冻结 → 1C-Test（HarmBench-Test）→
