@@ -46,11 +46,22 @@ def system_routing_tree(active_domain: Optional[str] = None,
  .rt-s{{font-size:10.5px;fill:#67738a}}
  .rt-e{{stroke:{trace};stroke-width:1.8;fill:none}}
  .rt-hot{{stroke:{lens};stroke-width:1.6}}
+ .rt-flow{{stroke:{lens};stroke-width:2.4;stroke-linecap:round;
+   stroke-dasharray:5 13;opacity:0;fill:none;
+   filter:drop-shadow(0 0 4px rgba(47,111,235,.5));
+   animation:rtflow 1s linear infinite, rtrelay 4.2s infinite}}
+ @keyframes rtflow{{to{{stroke-dashoffset:-18}}}}
+ @keyframes rtrelay{{0%{{opacity:0}}4%{{opacity:1}}14%{{opacity:1}}
+   20%{{opacity:0}}100%{{opacity:0}}}}
 </style>
 <path class="rt-e" d="M430 60 L 200 105"/><path class="rt-e" d="M430 60 L 660 105"/>
 <path class="rt-e" d="M200 160 L 200 210"/><path class="rt-e" d="M660 160 L 660 210"/>
 <path class="rt-e" d="M200 265 L 330 300"/><path class="rt-e" d="M660 265 L 530 300"/>
 <path class="rt-e" d="M430 330 L 430 352"/>
+<path class="rt-flow" style="animation-delay:0s,0s" d="M430 60 L {dl} 105"/>
+<path class="rt-flow" style="animation-delay:0s,.5s" d="M{dl} 160 L {dl} 210"/>
+<path class="rt-flow" style="animation-delay:0s,1.1s" d="M{dl} 265 L {dcx} 300"/>
+<path class="rt-flow" style="animation-delay:0s,1.8s" d="M{dcx} 330 L 430 352"/>
 <rect class="rt-n" x="330" y="18" width="200" height="44" rx="9" {glow_root}/>
 <text x="430" y="37" text-anchor="middle" class="rt-t">安全任务池</text>
 <text x="430" y="53" text-anchor="middle" class="rt-s">内置安全场景（original goal 固定）</text>
@@ -78,6 +89,8 @@ def system_routing_tree(active_domain: Optional[str] = None,
 <text x="430" y="392" text-anchor="middle" class="rt-s" fill="#7E9AB0">
 安全任务 → 专业裁判 → 观察或引导 → 完整轨迹 → 独立评审（默认观察不干预，引导为实验能力）</text>
 </svg>""".format(lens=LENS, panel=PANEL, trace=TRACE,
+                dl=(660 if active_domain == "goal" else 200),
+                dcx=(530 if active_domain == "goal" else 330),
                 glow_root=glow("root"),
                 glow_jc=glow("judge-content"), glow_jg=glow("judge-goal"),
                 glow_ctrl_c=glow("control-content"),

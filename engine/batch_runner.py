@@ -74,8 +74,12 @@ class BatchRunner:
         model_manager=None,
         provenance: Optional[dict] = None,
         base_seed: int = 42,
+        on_step=None,
     ) -> None:
-        """coordinator_factory(protocol) 与 reward_factory(budget) 每条件新建。"""
+        """coordinator_factory(protocol) 与 reward_factory(budget) 每条件新建。
+
+        on_step(step, slot)：每轮落步后回调（UI 流式刷新用；回调异常不影响运行）。
+        """
         self.coordinator_factory = coordinator_factory
         self.red_agent = red_agent
         self.target = target
@@ -86,6 +90,7 @@ class BatchRunner:
         self.model_manager = model_manager
         self.provenance = provenance or {}
         self.base_seed = base_seed
+        self.on_step = on_step
 
     # ------------------------------------------------------------------
     def run(
@@ -261,6 +266,11 @@ class BatchRunner:
                 })
                 slot.trajectory.append(step)
                 self.memory.update(step)
+                if self.on_step is not None:
+                    try:
+                        self.on_step(step, slot)
+                    except Exception:  # noqa: BLE001 UI 回调不得影响运行
+                        logger.debug("on_step callback failed", exc_info=True)
                 logger.info(
                     "[%s] task=%s round=%d strategy=%s outcome=%s online=%s",
                     slot.condition_id, slot.task.task_id, step.round_id,

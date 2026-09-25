@@ -149,6 +149,8 @@ class SafeLoopMainAgent:
         self.events: List[Dict] = []
         self.trajectories: Dict[str, list] = {}
         self.report: Optional[Dict] = None
+        # 实况流式缓冲：每完成一轮，UI 可直接读取渲染
+        self.live_events: List[Dict] = []
 
     # -------------------------------------------------------------- events
     def _emit(self, kind: str, **data) -> None:
@@ -244,11 +246,27 @@ class SafeLoopMainAgent:
             return RewardFunction(RewardConfig(**(cfg.get("reward", {}) or {})), budget)
 
         cond = "{}_{}".format(self.run_id, br["name"])
+        def _on_step(step, slot):
+            self.live_events.append({
+                "branch": br["name"],
+                "task_id": slot.task.task_id,
+                "round": step.round_id + 1,
+                "strategy": step.action.strategy,
+                "prompt": step.action.prompt,
+                "response": step.response.text,
+                "advancement": step.judge_output.metadata.get("advancement"),
+                "safety": step.judge_output.metadata.get("safety"),
+                "action": (step.feedback.adaptation_action
+                           if step.feedback else None),
+                "success": bool(step.external_evaluation
+                                and step.external_evaluation.success),
+            })
+
         batch = BatchRunner(
             coordinator_factory=coordinator_factory, red_agent=red,
             target=target, judge=judge, memory=build_memory(cfg),
             reward_factory=reward_factory, feedback_builder=fb_builder,
-            model_manager=mm, base_seed=self.seed,
+            model_manager=mm, base_seed=self.seed, on_step=_on_step,
             provenance={"run_id": self.run_id, "branch": br["name"],
                         "feedback_mode": br["mode"], "mode": self.plan.request.mode,
                         "main_agent": self.version, "seed": self.seed})

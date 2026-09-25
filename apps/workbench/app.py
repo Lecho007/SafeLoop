@@ -105,6 +105,10 @@ def get_agent():
     return st.session_state.agent or st.session_state.replay_agent
 
 
+def _ok(s):
+    return bool(s.external_evaluation and s.external_evaluation.success)
+
+
 agent = get_agent()
 
 
@@ -172,16 +176,19 @@ if st.session_state.get("monitor") is not None:
         if not mon.get("running"):
             st.session_state["monitor"] = None  # 完成横幅显示一次后清除
 
-tab0, tab1, tab2, tab4, tab5 = st.tabs([
-    "总览", "实况演示", "轨迹回放", "风险发现", "评估报告"])
+tab0, tab2, tab4, tab5 = st.tabs([
+    "总览", "轨迹回放", "风险发现", "评估报告"])
 
 # ============================================================ Tab 0 总览
 with tab0:
-    st.markdown(HERO, unsafe_allow_html=True)
-    st.markdown("#### 系统路由树")
-    st.caption("任务按风险语义分流到专业裁判；默认只观察不干预，引导反馈为实验能力；"
-               "独立评审官永远在闭环之外。")
-    st.markdown(system_routing_tree(), unsafe_allow_html=True)
+    _h, _r = st.columns(2)
+    with _h:
+        st.markdown(HERO, unsafe_allow_html=True)
+    with _r:
+        st.markdown("#### 任务路由")
+        st.caption("任务按风险语义分流到专业裁判；默认只观察不干预，"
+                   "引导反馈为实验能力；独立评审官永远在闭环之外。")
+        st.markdown(system_routing_tree(), unsafe_allow_html=True)
 
     st.divider()
     left, right = st.columns([1.05, 1])
@@ -321,6 +328,117 @@ with tab0:
                 st.session_state.agent = a
                 _run_in_background(a, int(max_tasks) * 3 * n_branch, est)
 
+    # ---------------------------------------------------------- 实况区
+    st.divider()
+    live_agent = st.session_state.get("agent")
+    mon = st.session_state.get("monitor")
+    running = bool(mon and mon.get("running"))
+    if running and live_agent is not None and live_agent.live_events:
+        st.markdown("##### 实况（真实运行，逐轮流式追加）")
+        evs = live_agent.live_events[-40:]
+        _d1, _d2, _d3 = st.columns([1, 2.1, 1.6])
+        with _d2:
+            blocks = []
+            for e in evs:
+                jt = ("目标推进 {}".format(e["advancement"]) if e["advancement"]
+                      else "内容判定 {}".format(e["safety"]) if e["safety"] else "已记录")
+                light = ("sl-dot sl-dot-red" if e["success"] else
+                         "sl-dot sl-dot-amber" if e["advancement"] == "PARTIAL"
+                         or e["safety"] == "Unsafe" else "sl-dot sl-dot-green")
+                blocks.append(
+                    "<div style='font-weight:600;margin:10px 0 4px'>"
+                    "<span class='{l}'></span>{tid} 第 {n} 轮　{st}"
+                    "<span class='sl-meta'>　判别：{j}</span></div>"
+                    "<div class='sl-bubble sl-q'><div class='sl-role'>测试员提问</div>{q}</div>"
+                    "<div class='sl-bubble sl-a'><div class='sl-role'>模型回答</div>{a}</div>"
+                    .format(l=light, tid=e["task_id"], n=e["round"],
+                            st=STRATEGY_ZH.get(e["strategy"], e["strategy"]), j=jt,
+                            q=str(e["prompt"])[:240].replace("&", "&amp;").replace("<", "&lt;"),
+                            a=str(e["response"])[:360].replace("&", "&amp;").replace("<", "&lt;")))
+            st.markdown("".join(blocks), unsafe_allow_html=True)
+        with _d3:
+            st.markdown("**决策树**（已完成的决策点亮并流动）")
+            from tree_model import SIGNAL_OF_ADVANCEMENT
+            rnds = []
+            seen = {}
+            for e in evs:
+                seen[e["round"]] = e
+            for r in sorted(seen):
+                e = seen[r]
+                rnds.append({"round": r, "strategy": e["strategy"],
+                             "signal": SIGNAL_OF_ADVANCEMENT.get(e["advancement"])
+                             or ("risk" if e["safety"] == "Unsafe" else
+                                 "safe" if e["safety"] in ("Safe", None) else "warn"),
+                             "action": e["action"], "state": "decided"})
+            st.markdown(decision_path_tree(rnds, live=True, progress=len(rnds)),
+                        unsafe_allow_html=True)
+    else:
+        st.markdown("##### 实况预演（示例数据，点击开始后自动切换为真实运行）")
+        if not pool:
+            st.info("暂无示例数据。")
+        else:
+            demo = next((x for x in pool if len(x.steps) >= 2), pool[0])
+            nodes = trajectory_to_nodes(demo)
+            _pc, _ac = st.columns([2.6, 1])
+            with _ac:
+                if st.button("自动播放（逐轮推进）", use_container_width=True):
+                    _cur = st.session_state.get("live_step", len(nodes))
+                    st.session_state["autoplay_left"] = len(nodes) - _cur
+                    st.rerun()
+            max_step = st.slider("演示进度（逐轮推进）", 1, len(nodes),
+                                 st.session_state.get("live_step", len(nodes)),
+                                 key="live_step")
+            _c1, _c2, _c3 = st.columns([1, 2.1, 1.6])
+            with _c1:
+                st.markdown("**智能体状态坞**")
+                st.markdown(
+                    "<div class='sl-dock'>"
+                    "<div class='sl-dock-item done'>主智能体 ✓ 已规划</div>"
+                    "<div class='sl-dock-item {ra}'>红方测试员</div>"
+                    "<div class='sl-dock-item active'>裁判（观察中）</div>"
+                    "<div class='sl-dock-item {ea}'>独立评审官</div></div>".format(
+                        ra="active" if max_step < len(nodes) else "done",
+                        ea="done" if max_step == len(nodes) else ""),
+                    unsafe_allow_html=True)
+                demo_dom = (demo.task.metadata or {}).get("feedback_observability")
+                with st.expander("当前任务在系统中的位置", expanded=True):
+                    st.markdown(system_routing_tree(
+                        active_domain=("goal" if demo_dom == "goal_compliance"
+                                       else "content"),
+                        active_role="judge"), unsafe_allow_html=True)
+            with _c2:
+                blocks = []
+                for s in demo.steps[:max_step]:
+                    adv = s.judge_output.metadata.get("advancement")
+                    sig = s.judge_output.metadata.get("safety")
+                    jt = ("目标推进 {}".format(adv) if adv
+                          else "内容判定 {}".format(sig) if sig else "已记录")
+                    light = ("sl-dot sl-dot-red" if _ok(s) else
+                             "sl-dot sl-dot-amber" if adv == "PARTIAL"
+                             or sig == "Unsafe" else "sl-dot sl-dot-green")
+                    blocks.append(
+                        "<div style='font-weight:600;margin:10px 0 4px'>"
+                        "<span class='{l}'></span>第 {n} 轮　{st}"
+                        "<span class='sl-meta'>　判别：{j}</span></div>"
+                        "<div class='sl-bubble sl-q'><div class='sl-role'>测试员提问</div>{q}</div>"
+                        "<div class='sl-bubble sl-a'><div class='sl-role'>模型回答</div>{a}</div>"
+                        .format(l=light, n=s.round_id + 1,
+                                st=STRATEGY_ZH.get(s.action.strategy, s.action.strategy),
+                                j=jt,
+                                q=s.action.prompt[:260].replace("&", "&amp;").replace("<", "&lt;"),
+                                a=s.response.text[:380].replace("&", "&amp;").replace("<", "&lt;")))
+                st.markdown("".join(blocks), unsafe_allow_html=True)
+            with _c3:
+                st.markdown("**决策树**（完整路径先展示，已完成的决策点亮并流动）")
+                demo_trig = next((s.round_id + 1 for s in demo.steps if _ok(s)), None)
+                st.markdown(decision_path_tree(
+                    nodes, verdict=None if max_step < len(nodes) else
+                    ("风险确认" if any(_ok(s) for s in demo.steps) else "抵御成功"),
+                    live=True, progress=max_step,
+                    trigger_round=(demo_trig if demo_trig and
+                                   demo_trig <= max_step else None)),
+                    unsafe_allow_html=True)
+
 # ============================================================ 数据准备
 pool = []
 report = None
@@ -329,98 +447,6 @@ if agent is not None:
     pool = (agent.trajectories.get("STD")
             or next(iter(agent.trajectories.values()), []))
 
-
-def _ok(s):
-    return bool(s.external_evaluation and s.external_evaluation.success)
-
-
-# ============================================================ Tab 1 实况演示
-with tab1:
-    st.markdown("##### 多智能体实况协作")
-    st.caption("下面用内置真实轨迹驱动一次完整任务的实况重演——左侧是各智能体状态，"
-               "中间是逐轮对话，右侧的决策树随事件逐轮生长。")
-    if not pool:
-        st.info("暂无轨迹数据。先在「总览」载入示例数据。")
-    else:
-        demo = next((t for t in pool if len(t.steps) >= 2), pool[0])
-        c1, c2, c3 = st.columns([1, 2.1, 1.6])
-        nodes = trajectory_to_nodes(demo)
-        _pcol, _acol = st.columns([2.4, 1])
-        with _acol:
-            if st.button("自动播放（逐轮推进）", use_container_width=True):
-                _cur = st.session_state.get("live_step", len(nodes))
-                st.session_state["autoplay_left"] = len(nodes) - _cur
-                st.rerun()
-        # 阶段滑块 = 事件推进（决策树逐轮点亮的演示形态）
-        max_step = st.slider("演示进度（逐轮推进）", 1, len(nodes),
-                             st.session_state.get("live_step", len(nodes)),
-                             key="live_step")
-        with c1:
-            st.markdown("**智能体状态坞**")
-            cur = nodes[max_step - 1]
-            st.markdown(
-                "<div class='sl-dock'>"
-                "<div class='sl-dock-item done'>🧠 主智能体 ✓ 已规划</div>"
-                "<div class='sl-dock-item {ra}'>🕵️ 红方测试员</div>"
-                "<div class='sl-dock-item {ja}'>🔍 {} 裁判</div>"
-                "<div class='sl-dock-item {ca}'>🎛️ 控制器</div>"
-                "<div class='sl-dock-item {ea}'>⚖️ 独立评审官</div></div>".format(
-                    "目标推进" if (demo.task.metadata or {}).get(
-                        "feedback_observability") == "goal_compliance" else "内容安全",
-                    ra="active" if max_step < len(nodes) else "done",
-                    ja="active",
-                    ca="done" if cur.get("action") else "",
-                    ea="done" if max_step == len(nodes) else ""),
-                unsafe_allow_html=True)
-            if max_step == len(nodes):
-                verdict = "风险确认" if any(_ok(s) for s in demo.steps) else "抵御成功"
-                st.markdown('<span class="sl-pill {}">{}</span>'.format(
-                    "on" if verdict == "抵御成功" else "", "评审官终裁：" + verdict),
-                    unsafe_allow_html=True)
-            # 迷你系统路由树：当前任务域分支高亮 + 裁判节点脉冲（实况联动）
-            demo_dom = (demo.task.metadata or {}).get("feedback_observability")
-            dom = ("goal" if demo_dom == "goal_compliance" else "content")
-            st.markdown("**系统路由联动**")
-            with st.expander("当前任务在系统中的位置", expanded=True):
-                st.markdown(system_routing_tree(
-                    active_domain=dom, active_role="judge"),
-                    unsafe_allow_html=True)
-        with c2:
-            blocks = []
-            for s in demo.steps[:max_step]:
-                adv = s.judge_output.metadata.get("advancement")
-                sig = s.judge_output.metadata.get("safety")
-                jt = ("目标推进 {}".format(adv) if adv
-                      else "内容判定 {}".format(sig) if sig else "已记录")
-                light = ("sl-dot sl-dot-red" if _ok(s) else
-                         "sl-dot sl-dot-amber" if adv == "PARTIAL"
-                         or sig == "Unsafe" else "sl-dot sl-dot-green")
-                blocks.append(
-                    "<div style='font-weight:600;margin:10px 0 4px'>"
-                    "<span class='{l}'></span>第 {n} 轮　{st}"
-                    "<span class='sl-meta'>　判别：{j}</span></div>"
-                    "<div class='sl-bubble sl-q'><div class='sl-role'>测试员提问</div>{q}</div>"
-                    "<div class='sl-bubble sl-a'><div class='sl-role'>模型回答</div>{a}</div>"
-                    .format(l=light, n=s.round_id + 1,
-                            st=STRATEGY_ZH.get(s.action.strategy,
-                                               s.action.strategy), j=jt,
-                            q=s.action.prompt[:260].replace("&", "&amp;")
-                            .replace("<", "&lt;"),
-                            a=s.response.text[:380].replace("&", "&amp;")
-                            .replace("<", "&lt;")))
-            st.markdown("".join(blocks), unsafe_allow_html=True)
-        with c3:
-            st.markdown("**决策树**（完整路径先展示，已完成的决策点亮并流动）")
-            demo_trig = next((s.round_id + 1 for s in demo.steps if _ok(s)), None)
-            st.markdown(decision_path_tree(
-                nodes, verdict=None if max_step < len(nodes) else
-                ("风险确认" if any(_ok(s) for s in demo.steps) else "抵御成功"),
-                live=True, progress=max_step,
-                trigger_round=(demo_trig if demo_trig and
-                               demo_trig <= max_step else None)),
-                unsafe_allow_html=True)
-            st.caption("灰暗部分 = 尚未进行的决策；点亮节点 = 已完成轮次（红/黄/绿 = "
-                       "裁判信号），发光流动的连线 = 已执行的决策动作。")
 
 # ============================================================ Tab 2 轨迹回放
 with tab2:
