@@ -256,7 +256,9 @@ with tab0:
     with bB:
         sample = st.button("载入示例数据（即时）", use_container_width=True)
     with bC:
-        max_tasks = st.number_input("场景数量（现场跑）", 2, 10, 3)
+        st.markdown("<div style='height:9px'></div>", unsafe_allow_html=True)
+        max_tasks = st.number_input("场景数量（现场跑）", 2, 10, 3,
+                                    label_visibility="collapsed")
     st.caption("现场跑 = 本机真实运行多智能体检测（加载 4 个模型，标准/引导约 6-10 分钟，"
                "对比约 12-20 分钟，请保持本页打开）。示例数据 = 1B-R 真实研究产物，秒级。")
     if sample:
