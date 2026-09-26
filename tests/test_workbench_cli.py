@@ -19,8 +19,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
 import workbench_cli as wc
 
 
-def _mk_step(rid, strategy, advancement=None, safety=None, ok=None, text="a"):
-    return NS(round_id=rid, action=NS(strategy=strategy),
+def _mk_step(rid, strategy, advancement=None, safety=None, ok=None, text="a",
+             prompt="p"):
+    return NS(round_id=rid, action=NS(strategy=strategy, prompt=prompt),
               judge_output=NS(metadata={"advancement": advancement,
                                         "safety": safety}, outcome=None),
               external_evaluation=NS(success=ok) if ok is not None else None,
@@ -193,7 +194,7 @@ class TestApiTargetParse(unittest.TestCase):
     def test_default_budget_raised_for_reasoning_models(self):
         from targets.api_target import OpenAIChatTarget
         t = OpenAIChatTarget({"base_url": "https://x/v1", "model": "m"})
-        self.assertGreaterEqual(t.gen["max_tokens"], 4096)
+        self.assertGreaterEqual(t.gen["max_tokens"], 8192)
 
     def test_anthropic_and_responses_parse(self):
         from targets.api_target import AnthropicTarget, OpenAIResponsesTarget
@@ -206,6 +207,34 @@ class TestApiTargetParse(unittest.TestCase):
         text, _, finish = r._parse({"output_text": "ok", "status": "completed",
                                     "usage": {}})
         self.assertEqual((text, finish), ("ok", "completed"))
+
+
+class TestTranscript(unittest.TestCase):
+    def test_full_text_saved_without_truncation(self):
+        long_q = "Q" * 3000
+        long_a = "A" * 5000
+        traj = _mk_traj("JBB-0050", "JBB:Disinformation", [
+            _mk_step(0, "direct", safety="Safe", ok=False, prompt=long_q, text=long_a),
+            _mk_step(1, "roleplay", safety="Unsafe", ok=True, prompt="q2", text="a2")])
+        txt = wc.build_transcript("run-x", "standard", [("STD", [traj])])
+        self.assertIn(long_q, txt)                 # 问题全文
+        self.assertIn(long_a, txt)                 # 回答全文
+        self.assertIn("[1/1] JBB-0050 ｜ 虚假信息（第2轮触发）", txt)
+        self.assertIn("判别: Unsafe", txt)
+        self.assertIn("E: 风险确认", txt)
+
+    def test_empty_answer_marked(self):
+        traj = _mk_traj("T1", "Privacy", [_mk_step(0, "direct", text="   ")])
+        txt = wc.build_transcript("run-y", "guided", [("GUI", [traj])])
+        self.assertIn("（空回答", txt)
+        self.assertIn("finish=length", txt)
+
+    def test_compare_mode_lists_all_branches(self):
+        trajs = [_mk_traj("T1", "Privacy", [_mk_step(0, "direct")])]
+        txt = wc.build_transcript("run-z", "compare",
+                                  [("STD", trajs), ("GUI", trajs)])
+        self.assertIn("## 分支 STD（1 个场景）", txt)
+        self.assertIn("## 分支 GUI（1 个场景）", txt)
 
 
 class TestProgress(unittest.TestCase):

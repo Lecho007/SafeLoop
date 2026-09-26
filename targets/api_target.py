@@ -25,8 +25,9 @@ PROVIDERS = ("openai_chat", "anthropic", "openai_responses")
 
 DEFAULTS = {"temperature": 0.7, "top_p": 1.0,
             # 推理型模型（deepseek-reasoner/flash 等）先输出思考链再给最终回答，
-            # 思考同样消耗 completion 预算：512 会把最终回答截成空（finish=length）
-            "max_tokens": 4096,
+            # 思考同样消耗 completion 预算：实测 4096 下最难的攻击仍有思考耗尽
+            # 导致空回答（finish=length），默认再放宽到 8192
+            "max_tokens": 8192,
             "timeout": 60, "retries": 3}
 
 

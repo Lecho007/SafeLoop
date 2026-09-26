@@ -180,9 +180,10 @@ PYTHONPATH=. $PY apps/cli/safeloop_cli.py api-eval \
 #   target: {backend: api, provider: openai_chat,
 #            base_url: https://…/v1, model: my-model,
 #            api_key_env: TARGET_API_KEY,
-#            generation: {temperature: 0.7, max_tokens: 4096, timeout: 60, retries: 3}}
-#            ↑ max_tokens 默认已 4096（82c027d）：推理型模型（deepseek-flash/reasoner）
-#              的思考链消耗同一 completion 预算，旧默认 512 会把最终回答截成空
+#            generation: {temperature: 0.7, max_tokens: 8192, timeout: 60, retries: 3}}
+#            ↑ max_tokens 默认已 8192（82c027d 起 4096，后实测最难攻击仍会思考耗尽，放宽至 8192）：
+#              推理型模型（deepseek-flash/reasoner）的思考链消耗同一 completion 预算，
+#              旧默认 512 会把最终回答截成空
 
 # ================= SafeLoop v1.0 作品层（2026-09-25，d72323c）=================
 # Workbench GUI（浏览器四页工作台：输入→多智能体运行视图→轨迹证据链→报告）
@@ -206,12 +207,15 @@ PYTHONPATH=. $PY apps/cli/safeloop_cli.py evaluate --mode compare --max-tasks 4 
 # 必须在 safeLoop 环境跑（引擎要 transformers——base 环境只装了 rich，跑到引擎才报错）
 PYTHONPATH=. $PY apps/cli/workbench_cli.py                       # 交互向导：目标→模式→场景数
 PYTHONPATH=. $PY apps/cli/workbench_cli.py --mode standard -n 3   # 带参数直接跑（可加 --suite/--config/--budget）
-# DeepSeek 等推理型黑盒（key 只经环境变量；回答预算默认 4096，思考链不会截空回答）：
+# DeepSeek 等推理型黑盒（key 只经环境变量；回答预算默认 8192，思考链不会截空回答）：
 export TARGET_API_KEY="sk-..."
 PYTHONPATH=. $PY apps/cli/workbench_cli.py \
     --base-url https://api.deepseek.com/v1 --model deepseek-flash --mode standard -n 3
 # 重渲染已保存的报告 JSON：
 PYTHONPATH=. $PY apps/cli/workbench_cli.py report outputs/reports/run-x_report.json
+# 每次运行自动另存完整对话存档（红方问题+被测回答全文，无截断）：
+#   outputs/reports/run-x_transcript.md   ← 想看全部问答内容看这个
+#   outputs/evaluations/run-x_STD.jsonl   ← 机器可读的逐轮全文（含判别/评分/reward）
 # 结果解读：判别列=Qwen3Guard 过程观察（Unsafe≠风险）；E 列=StrongREJECT 最终裁决
 # （风险只数 E:风险确认）；出现"（空回答）"轮次时结论偏乐观，需调大回答预算重跑
 

@@ -220,6 +220,37 @@ def fmt_elapsed(seconds: float) -> str:
     return "{:02d}:{:02d}".format(int(seconds) // 60, int(seconds) % 60)
 
 
+def build_transcript(run_id: str, mode: str, branches) -> str:
+    """完整对话存档（无截断）：每场景逐轮的红方问题/被测回答全文 + 判别 + E 结论。"""
+    lines = ["# SafeLoop 完整对话记录", "",
+             "- run: {} ｜ 模式: {}".format(run_id, MODE_ZH.get(mode, mode)),
+             "- 内容：全部场景、逐轮红方问题与被测回答**全文**（不截断）、裁判判别、独立评审结论", ""]
+    for branch, trajs in branches:
+        lines += ["", "---", "", "## 分支 {}（{} 个场景）".format(branch, len(trajs)), ""]
+        for n, t in enumerate(trajs, 1):
+            cat = (getattr(t.task, "harm_category", "") or "").replace("JBB:", "")
+            zh = CATEGORY_ZH.get(cat, cat or "未分类")
+            first = next((k + 1 for k, s in enumerate(t.steps) if _step_ok(s)), None)
+            dom = (getattr(t.task, "metadata", {}) or {}).get("feedback_observability") or "—"
+            tag = "第{}轮触发".format(first) if first else "未触发"
+            lines += ["## [{}/{}] {} ｜ {}（{}） ｜ 域: {}".format(
+                n, len(trajs), t.task.task_id, zh, tag, dom), ""]
+            lines += ["**测试目标（全程固定）**：{}".format(
+                getattr(t.task, "goal", "") or "（未记录）"), ""]
+            for s in t.steps:
+                strat = getattr(s.action, "strategy", None)
+                lines += ["### R{} ｜ {} ｜ 判别: {} ｜ E: {}".format(
+                    getattr(s, "round_id", 0) + 1, STRATEGY_ZH.get(strat, strat or "?"),
+                    verdict_short(s), e_short(s)), "", "**红方问题**", "", "```text",
+                    (getattr(s.action, "prompt", "") or "（空）"), "```", "",
+                    "**被测回答**", "", "```text"]
+                ans = (getattr(s.response, "text", "") or "").strip()
+                lines += [ans if ans else
+                          "（空回答——回答预算内无最终内容：多为思考耗尽 finish=length 或上游拦截）",
+                          "```", ""]
+    return "\n".join(lines) + "\n"
+
+
 def _detail_blocks(lines: List[str]) -> List[List[str]]:
     blocks, cur = [], []
     for ln in lines:
@@ -471,6 +502,12 @@ def run_flow(console: "Console", args) -> int:
                 "[yellow]⚠ {}/{} 轮回答为空：被测端在该回答预算内没有产出内容"
                 "（截断或上游过滤），这些轮不计入风险，本次结论会低估风险，"
                 "建议调大回答预算后重跑。[/yellow]".format(n_empty, n_rounds))
+    transcript = build_transcript(agent.run_id, mode,
+                                  sorted(agent.trajectories.items()))
+    tpath = "outputs/reports/{}_transcript.md".format(agent.run_id)
+    with open(tpath, "w", encoding="utf-8") as f:
+        f.write(transcript)
+    console.print("完整对话记录（问答全文、无截断）：[underline]{}[/underline]".format(tpath))
     return 0
 
 
