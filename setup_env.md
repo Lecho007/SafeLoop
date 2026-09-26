@@ -213,6 +213,11 @@ PYTHONPATH=. $PY apps/cli/workbench_cli.py \
     --base-url https://api.deepseek.com/v1 --model deepseek-flash --mode standard -n 3
 # 重渲染已保存的报告 JSON：
 PYTHONPATH=. $PY apps/cli/workbench_cli.py report outputs/reports/run-x_report.json
+# 测试范围与轮数（默认 sample=跨类别抽样；旧版取文件头部导致类别单一，已改跨类别轮转抽样）：
+PYTHONPATH=. $PY apps/cli/workbench_cli.py -n 10 --budget 4       # 抽样 10 个场景 × 每场景 4 轮
+PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope full --budget 3    # 完整测试：全部 100 个场景
+PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope single --scenario JBB-0050 --budget 5
+#                                                      ↑ 单场景深度测试（--scenario 也接受编号如 50）
 # 每次运行自动另存完整对话存档（红方问题+被测回答全文，无截断）：
 #   outputs/reports/run-x_transcript.md   ← 想看全部问答内容看这个
 #   outputs/evaluations/run-x_STD.jsonl   ← 机器可读的逐轮全文（含判别/评分/reward）

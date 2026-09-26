@@ -46,7 +46,8 @@ class EvaluationRequest:
     suite: str = "jbb100"
     budget_per_task: int = 5
     mode: str = "standard"
-    max_tasks: Optional[int] = None     # 演示用子集
+    max_tasks: Optional[int] = None     # 演示用子集（None = 全部场景）
+    scenario_ids: Optional[List[str]] = None   # 指定场景（单场景深度测试），优先于 max_tasks
     api_target: Optional[Dict[str, Any]] = None   # 黑盒 API 待测模型配置
     output: List[str] = field(default_factory=lambda: [
         "summary", "metrics", "representative_cases", "full_report"])
@@ -132,6 +133,32 @@ class EvaluationPlanner:
             config_path=self.config_path)
 
 
+# ---------------------------------------------------------------- task sampling
+def _stratified_sample(pool: List, n: int) -> List:
+    """跨危害类别轮转抽样：每类轮流取一个（类内保持文件顺序），确定性、可复现。
+
+    旧逻辑 content[:n] 取文件头部，导致小子集的类别高度单一（如全是虚假信息）。
+    """
+    if n >= len(pool):
+        return list(pool)
+    by_cat: Dict[str, List] = {}
+    for t in pool:
+        by_cat.setdefault(getattr(t, "harm_category", "") or "", []).append(t)
+    cats = sorted(by_cat)
+    out: List = []
+    i = 0
+    while len(out) < n:
+        progressed = False
+        for c in cats:
+            if i < len(by_cat[c]) and len(out) < n:
+                out.append(by_cat[c][i])
+                progressed = True
+        if not progressed:
+            break
+        i += 1
+    return out
+
+
 # ---------------------------------------------------------------- main agent
 class SafeLoopMainAgent:
     """总控（§五六件事：理解/规划/构造/调度/监督/回答）。"""
@@ -180,11 +207,20 @@ class SafeLoopMainAgent:
         assert self.plan is not None
         cfg = load_yaml(self.plan.config_path)
         tasks = load_tasks(cfg)
-        if self.plan.request.max_tasks:
+        if self.plan.request.scenario_ids:
+            wanted = list(self.plan.request.scenario_ids)
+            by_id = {t.task_id: t for t in tasks}
+            missing = [sid for sid in wanted if sid not in by_id]
+            if missing:
+                raise ValueError("任务集中不存在指定场景: {}（可用示例: {}）".format(
+                    missing, sorted(by_id)[:5]))
+            tasks = [by_id[sid] for sid in wanted]
+        elif self.plan.request.max_tasks:
             content, goal = _split_domains(tasks)
             nc = min(self.plan.request.max_tasks * 7 // 10, len(content))
             ng = min(self.plan.request.max_tasks - nc, len(goal))
-            tasks = content[:nc] + goal[:ng]
+            # 跨类别轮转抽样（旧逻辑取文件头部，导致类别单一——如全是虚假信息）
+            tasks = _stratified_sample(content, nc) + _stratified_sample(goal, ng)
         self._set_state("RUNNING")
         self.trajectories = {}
         for br in self.plan.branches:

@@ -37,8 +37,7 @@ from rich.text import Text
 from terms import CATEGORY_ZH, STRATEGY_ZH, compare_verdict, risk_grade, stars
 
 MODE_ZH = {"standard": "标准检测", "guided": "智能引导", "compare": "对比检测"}
-MODE_DUR = {"standard": "约 6-10 分钟", "guided": "约 6-10 分钟",
-            "compare": "约 12-20 分钟"}
+SCOPE_ZH = {"sample": "抽样测试", "full": "完整测试", "single": "单场景测试"}
 # terms.risk_grade 返回语义色名，映射到 rich 样式
 RICH_OF = {"red": "bold red", "amber": "yellow", "green": "green", "gray": "dim"}
 BAR_WIDTH = 22
@@ -384,13 +383,74 @@ def run_with_live(agent, total: int, console: "Console", plain: bool) -> int:
 
 
 # ------------------------------------------------------------------ 向导
-def ask_missing(console: "Console", args) -> Tuple[Optional[Dict], str, int]:
-    """补齐缺失参数：全缺时完整走三步向导，给了部分则只问缺项。
+def _suite_rows(args) -> List[Dict]:
+    """读取任务集原始行（task_id/goal/harm_category/metadata），供场景菜单与校验。"""
+    suite = getattr(args, "suite", None) or "jbb100"
+    if suite == "jbb100":
+        path = "data/tasks/jbb100_full.jsonl"
+    elif os.path.exists(suite):
+        path = suite
+    else:
+        path = "data/tasks/{}.jsonl".format(suite)
+    rows = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
 
-    返回 (api_cfg, mode, max_tasks)。
+
+def resolve_scenario_id(user_input: str, rows: List[Dict]) -> str:
+    """场景输入归一化：'50'→'JBB-0050'，大小写不敏感；找不到抛 ValueError。"""
+    u = (user_input or "").strip().upper()
+    if u.isdigit():
+        u = "JBB-{:04d}".format(int(u))
+    for r in rows:
+        if str(r.get("task_id", "")).upper() == u:
+            return r["task_id"]
+    raise ValueError("任务集中找不到场景 {}（示例: {}）".format(
+        user_input, "、".join(str(r.get("task_id")) for r in rows[:3])))
+
+
+def estimate_duration(total_rounds: int) -> str:
+    """按轮数估算时长（实测单轮 0.7-1.5 分钟：红方生成+被测回答+裁判）。"""
+    lo, hi = total_rounds * 0.7, total_rounds * 1.5
+
+    def fmt(m: float) -> str:
+        return "{:.1f} 小时".format(m / 60.0) if m >= 90 else "{:.0f} 分钟".format(m)
+
+    return "约 {}-{}".format(fmt(lo), fmt(hi))
+
+
+def pick_scenario(console: "Console", rows: List[Dict]) -> str:
+    """单场景选择：先选危害类别，再选具体场景。"""
+    by_cat: Dict[str, List[Dict]] = {}
+    for r in rows:
+        by_cat.setdefault(r.get("harm_category") or "未分类", []).append(r)
+    cats = sorted(by_cat)
+    console.print("选择危害类别：")
+    for i, c in enumerate(cats, 1):
+        zh = CATEGORY_ZH.get(c.replace("JBB:", ""), c)
+        console.print("  [bold]{})[/bold] {}（{} 个场景）".format(i, zh, len(by_cat[c])))
+    pick = Prompt.ask("类别编号", choices=[str(i) for i in range(1, len(cats) + 1)])
+    tasks = by_cat[cats[int(pick) - 1]]
+    console.print("选择场景：")
+    for i, r in enumerate(tasks, 1):
+        console.print("  [bold]{})[/bold] {} ｜ {}".format(
+            i, r.get("task_id"), (r.get("goal") or "")[:56]))
+    pick2 = Prompt.ask("场景编号", choices=[str(i) for i in range(1, len(tasks) + 1)])
+    return str(tasks[int(pick2) - 1]["task_id"])
+
+
+def ask_missing(console: "Console", args) -> Dict:
+    """补齐缺失参数：全缺时完整走向导，给了部分则只问缺项。
+
+    返回 {api_cfg, mode, scope, n_tasks, scenario_id, budget}。
+    scope: sample=跨类别抽样 n 个场景 / full=任务集全部场景 / single=指定单场景。
     """
-    full = (args.mode is None and args.max_tasks is None
-            and not args.base_url and not args.model)
+    full = (args.mode is None and args.scope is None and args.max_tasks is None
+            and args.scenario is None and not args.base_url and not args.model)
     if full:
         console.print(Panel(
             "[bold cyan]SafeLoop 终端工作台[/bold cyan]\n"
@@ -425,20 +485,57 @@ def ask_missing(console: "Console", args) -> Tuple[Optional[Dict], str, int]:
                 else:
                     console.print("[red]✗ 连接失败：{}[/red]".format(r.get("error")))
                     raise SystemExit(1)
-    # 2) 模式
+    # 2) 测试范围
+    rows = _suite_rows(args)
+    scenario_id = None
+    if args.scenario:
+        scope = "single"
+        scenario_id = resolve_scenario_id(args.scenario, rows)
+    elif args.scope:
+        scope = args.scope
+    elif full:
+        console.print("  [bold]1)[/bold] 抽样测试 — 跨危害类别均匀抽取若干场景（推荐）")
+        console.print("  [bold]2)[/bold] 完整测试 — 任务集全部 {} 个场景（耗时长）".format(len(rows)))
+        console.print("  [bold]3)[/bold] 单场景测试 — 指定一个场景反复多轮，深度测试")
+        pick = Prompt.ask("选择测试范围", choices=["1", "2", "3"], default="1")
+        scope = {"1": "sample", "2": "full", "3": "single"}[pick]
+    else:
+        scope = "sample"
+    # 3) 场景范围参数
+    n_tasks = None
+    if scope == "sample":
+        n_tasks = args.max_tasks
+        while n_tasks is None or not 2 <= n_tasks <= 20:
+            if n_tasks is not None:
+                console.print("[yellow]场景数需在 2-20 之间。[/yellow]")
+            n_tasks = IntPrompt.ask("场景数（跨类别抽样）", default=3)
+    elif scope == "single":
+        if scenario_id is None:
+            scenario_id = pick_scenario(console, rows)
+        else:
+            row = next(r for r in rows if r["task_id"] == scenario_id)
+            console.print("单场景：{} ｜ {}".format(
+                scenario_id, (row.get("goal") or "")[:60]))
+    # 4) 模式
     mode = args.mode
     if mode is None:
         for i, m in enumerate(("standard", "guided", "compare"), 1):
-            console.print("  [bold]{})[/bold] {}（{}）".format(i, MODE_ZH[m], MODE_DUR[m]))
+            console.print("  [bold]{})[/bold] {}".format(i, MODE_ZH[m]))
         pick = Prompt.ask("选择检测模式", choices=["1", "2", "3"], default="1")
         mode = {"1": "standard", "2": "guided", "3": "compare"}[pick]
-    # 3) 场景数
-    n = args.max_tasks
-    while n is None or not 2 <= n <= 10:
-        if n is not None:
-            console.print("[yellow]场景数需在 2-10 之间。[/yellow]")
-        n = IntPrompt.ask("场景数（每场景 3 轮）", default=3)
-    return api_cfg, mode, n
+    # 5) 每场景轮数（完整向导时询问；带参数跑默认 3）
+    budget = args.budget
+    if budget is None:
+        if full:
+            while budget is None or not 1 <= budget <= 10:
+                budget = IntPrompt.ask("每个场景查询轮数", default=3)
+        else:
+            budget = 3
+    elif not 1 <= budget <= 10:
+        console.print("[yellow]轮数需在 1-10 之间，已修正为 3。[/yellow]")
+        budget = 3
+    return {"api_cfg": api_cfg, "mode": mode, "scope": scope,
+            "n_tasks": n_tasks, "scenario_id": scenario_id, "budget": budget}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -448,8 +545,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--config", default=None,
                     help="后端配置 YAML（默认 configs/hardware/rtx4060_8g_1br.yaml）")
     ap.add_argument("--mode", choices=["standard", "guided", "compare"], help="检测模式")
-    ap.add_argument("-n", "--max-tasks", type=int, help="场景数 2-10（默认 3）")
-    ap.add_argument("--budget", type=int, default=3, help="每场景轮数（默认 3）")
+    ap.add_argument("--scope", choices=["sample", "full", "single"],
+                    help="测试范围：sample=跨类别抽样 n 个（默认）/ full=全部场景 / single=单场景")
+    ap.add_argument("--scenario", default=None,
+                    help="单场景测试：任务 ID（JBB-0050）或编号（50）")
+    ap.add_argument("-n", "--max-tasks", type=int, help="场景数 2-20（默认 3，仅 sample 范围）")
+    ap.add_argument("--budget", type=int, default=None, help="每场景查询轮数 1-10（默认 3）")
     ap.add_argument("--suite", default="jbb100", help="任务集（默认 jbb100）")
     ap.add_argument("--question", default=None, help="评估问题（默认自动生成）")
     ap.add_argument("--base-url", default=None, help="在线 API Base URL")
@@ -466,22 +567,42 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_flow(console: "Console", args) -> int:
     from safeloop.agents.main_agent import SafeLoopMainAgent
-    api_cfg, mode, n = ask_missing(console, args)
+    sel = ask_missing(console, args)
+    api_cfg, mode = sel["api_cfg"], sel["mode"]
+    scope, n_tasks = sel["scope"], sel["n_tasks"]
+    scenario_id, budget = sel["scenario_id"], sel["budget"]
     question = args.question or (
         "检测 API 模型 {} 的安全风险".format(api_cfg["model"]) if api_cfg
         else "检测本地模型 Phi-3.5 的安全风险")
     agent = SafeLoopMainAgent(
         config_path=args.config or "configs/hardware/rtx4060_8g_1br.yaml")
-    overrides = {"mode": mode, "max_tasks": n, "budget_per_task": args.budget,
+    overrides = {"mode": mode, "budget_per_task": budget,
                  "target_model": api_cfg["model"] if api_cfg else "phi-3.5-mini"}
+    if scope == "sample":
+        overrides["max_tasks"] = n_tasks
+        n_effective, scope_desc = n_tasks, "抽样 {} 个场景（跨类别）".format(n_tasks)
+    elif scope == "full":
+        overrides["max_tasks"] = None      # None = 任务集全部场景
+        n_effective, scope_desc = None, "全部场景"
+    else:
+        overrides["max_tasks"] = None
+        overrides["scenario_ids"] = [scenario_id]
+        n_effective, scope_desc = 1, "单场景 {}".format(scenario_id)
     if api_cfg:
         overrides["api_target"] = api_cfg
     plan = agent.submit(question, **overrides)
+    if n_effective is None:
+        n_effective = plan.n_tasks
     branch_names = [b["name"] for b in plan.branches]
-    total = n * args.budget * len(branch_names)
-    console.print("[bold]体检开始[/bold]：{} 个场景 × 每场景 {} 轮 ｜ 模式 {} ｜ "
-                  "分支 {} ｜ {}".format(n, args.budget, MODE_ZH[mode],
-                                        "/".join(branch_names), MODE_DUR[mode]))
+    total = n_effective * budget * len(branch_names)
+    est = estimate_duration(total)
+    if scope == "full":
+        console.print("[yellow]⚠ 完整测试：{} 个场景 × 每场景 {} 轮 = {} 轮查询，{}。"
+                      "建议先用抽样测试验证链路后再跑全量。[/yellow]".format(
+                          n_effective, budget, total, est))
+    console.print("[bold]体检开始[/bold]：{} ｜ 每场景 {} 轮 ｜ 模式 {} ｜ "
+                  "分支 {} ｜ {}".format(scope_desc, budget, MODE_ZH[mode],
+                                        "/".join(branch_names), est))
     rc = run_with_live(agent, total, console, plain=not sys.stdout.isatty())
     if rc != 0:
         return rc
@@ -522,7 +643,11 @@ def main_with_console(argv, console: "Console") -> int:
             return 1
         render_report(console, report, report_path=args.path)
         return 0
-    return run_flow(console, args)
+    try:
+        return run_flow(console, args)
+    except (ValueError, OSError) as exc:
+        console.print("[bold red]{}[/bold red]".format(exc))
+        return 1
 
 
 def main(argv=None) -> int:

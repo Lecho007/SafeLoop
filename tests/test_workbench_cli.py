@@ -237,6 +237,58 @@ class TestTranscript(unittest.TestCase):
         self.assertIn("## 分支 GUI（1 个场景）", txt)
 
 
+class TestScopeWizard(unittest.TestCase):
+    ROWS = [{"task_id": "JBB-0050", "goal": "g50"},
+            {"task_id": "JBB-0051", "goal": "g51"}]
+
+    def _args(self, **kw):
+        base = dict(mode=None, scope=None, max_tasks=None, scenario=None,
+                    base_url=None, model=None, provider="openai_chat",
+                    api_key_env="TARGET_API_KEY", suite="jbb100", budget=None,
+                    config=None, question=None)
+        base.update(kw)
+        return NS(**base)
+
+    def test_resolve_scenario_id(self):
+        self.assertEqual(wc.resolve_scenario_id("50", self.ROWS), "JBB-0050")
+        self.assertEqual(wc.resolve_scenario_id("jbb-0051", self.ROWS), "JBB-0051")
+        with self.assertRaises(ValueError):
+            wc.resolve_scenario_id("999", self.ROWS)
+
+    def test_estimate_duration_scales(self):
+        self.assertIn("分钟", wc.estimate_duration(9))
+        self.assertIn("小时", wc.estimate_duration(300))
+
+    def _ask(self, inputs, args):
+        old = sys.stdin
+        sys.stdin = io.StringIO(inputs)
+        try:
+            return wc.ask_missing(wc.Console(file=io.StringIO(), width=100), args)
+        finally:
+            sys.stdin = old
+
+    def test_partial_args_default_scope_sample(self):
+        sel = self._ask("3\n", self._args(mode="compare"))
+        self.assertEqual(sel["scope"], "sample")
+        self.assertEqual(sel["n_tasks"], 3)
+        self.assertEqual(sel["budget"], 3)
+        self.assertEqual(sel["mode"], "compare")
+
+    def test_full_wizard_scope_single_and_budget(self):
+        # 目标1(本地) → 范围3(单场景) → 类别1 → 场景1 → 模式1 → 轮数5
+        sel = self._ask("1\n3\n1\n1\n1\n5\n", self._args())
+        self.assertEqual(sel["scope"], "single")
+        self.assertEqual(sel["scenario_id"], "JBB-0050")
+        self.assertEqual(sel["budget"], 5)
+        self.assertEqual(sel["mode"], "standard")
+
+    def test_scenario_flag_implies_single(self):
+        sel = self._ask("1\n1\n3\n", self._args(scenario="50"))
+        self.assertEqual(sel["scope"], "single")
+        self.assertEqual(sel["scenario_id"], "JBB-0050")
+        self.assertEqual(sel["budget"], 3)
+
+
 class TestProgress(unittest.TestCase):
     def test_progress_bar(self):
         self.assertEqual(wc.progress_bar(0, 10), "░" * 26)
@@ -254,8 +306,19 @@ class TestParserAndMain(unittest.TestCase):
         args = wc.build_parser().parse_args(["--mode", "standard", "-n", "3"])
         self.assertEqual(args.mode, "standard")
         self.assertEqual(args.max_tasks, 3)
-        self.assertEqual(args.budget, 3)
+        self.assertIsNone(args.budget)          # 未给 --budget 时由向导/默认决定
         self.assertIsNone(args.cmd)
+
+    def test_parse_scope_flags(self):
+        args = wc.build_parser().parse_args(["--scope", "full", "--budget", "2"])
+        self.assertEqual(args.scope, "full")
+        self.assertEqual(args.budget, 2)
+        args = wc.build_parser().parse_args(
+            ["--scope", "single", "--scenario", "50"])
+        self.assertEqual(args.scope, "single")
+        self.assertEqual(args.scenario, "50")
+        with self.assertRaises(SystemExit):
+            wc.build_parser().parse_args(["--scope", "bogus"])
 
     def test_parse_report_subcommand(self):
         args = wc.build_parser().parse_args(["report", "x.json"])
