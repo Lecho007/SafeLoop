@@ -207,8 +207,8 @@ $PY scripts/run_v11_ablation.py --conditions S0,S1 --adaptive-q 200,300,400 \
     --tasks 20 --budget 5 --tag s_                             # 调度消融（D(Q)/Yield）
 $PY scripts/run_v11_ablation.py --conditions A0,A1,A2,A3 --adaptive-q 300 --tag joint_
 # 中文题库重建（源 CSV：github.com/STAIR-BUPT/JailBench 的 JailBench_seed.csv，
-# 存 data/raw/jailbench_seed.csv；重选/扩容后需人工两轮审核再交付）：
-$PY scripts/build_safeloop_cn.py --n 40
+# 存 data/raw/jailbench_seed.csv；默认全量导入，--n N 可选跨类别抽样子集）：
+$PY scripts/build_safeloop_cn.py
 
 # CLI
 PYTHONPATH=. python3 apps/cli/safeloop_cli.py report stage1b_r_4060   # 预跑报告
@@ -226,7 +226,7 @@ PYTHONPATH=. $PY apps/cli/workbench_cli.py \
 PYTHONPATH=. $PY apps/cli/workbench_cli.py -n 10 --budget 4
 PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope full --budget 3
 PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope single --scenario JBB-0050 --budget 5
-# 中文检测（SafeLoop-CN v0.1，40 条国标五域，pending_review 待人工审核）：
+# 中文检测（SafeLoop-CN = JailBench 公开 seed 全量 108 条，国标五域）：
 PYTHONPATH=. $PY apps/cli/workbench_cli.py --suite safeloop_cn -n 5
 # 运行管理（SQLite 历史库 outputs/runs/safeloop.db，重启不丢）：
 PYTHONPATH=. $PY apps/cli/workbench_cli.py history               # 历史列表（含导入的旧 run）

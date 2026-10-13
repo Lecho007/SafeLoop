@@ -226,7 +226,8 @@ with tab0:
             label_visibility="collapsed")
         suite_opt = st.radio("任务集", [
             "国际基准（JBB-100，英文）",
-            "中文检测（SafeLoop-CN v0.1，40 场景·待人工审核）"], index=0,
+            "中文检测（SafeLoop-CN，JailBench 全量 {} 场景）".format(
+                len(_task_rows("safeloop_cn")) or 108)], index=0,
             label_visibility="collapsed")
         suite_v = "jbb100" if "国际" in suite_opt else "safeloop_cn"
         rows = _task_rows(suite_v)

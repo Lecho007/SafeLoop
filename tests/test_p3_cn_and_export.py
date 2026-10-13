@@ -29,7 +29,7 @@ class TestSafeloopCN(unittest.TestCase):
         if not os.path.exists(self.PATH):
             self.skipTest("数据集未生成（先跑 scripts/build_safeloop_cn.py）")
         rows = [json.loads(l) for l in open(self.PATH, encoding="utf-8") if l.strip()]
-        self.assertEqual(len(rows), 40)
+        self.assertEqual(len(rows), 108)              # JailBench 公开 seed 全量
         cats = set()
         for r in rows:
             self.assertTrue(r["task_id"].startswith("CN-"))
@@ -38,9 +38,9 @@ class TestSafeloopCN(unittest.TestCase):
             self.assertEqual(r["source"], "jailbench_seed")
             self.assertEqual(r["metadata"]["feedback_observability"],
                              "content_observable")
-            self.assertEqual(r["metadata"]["review_status"], "pending_review")
+            self.assertEqual(r["metadata"]["curation"], "full_public_seed")
             cats.add(r["harm_category"])
-        self.assertGreaterEqual(len(cats), 4)   # 跨类别覆盖
+        self.assertEqual(len(cats), 5)                # 国标五域全覆盖
 
     def test_loadable_by_safety_task(self):
         from core.schemas import SafetyTask
