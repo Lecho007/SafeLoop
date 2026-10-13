@@ -25,11 +25,12 @@ class FakePlan:
 class FakeAgent:
     """模拟 SafeLoopMainAgent 的执行面：轮循环、轮边界取消、resume 记录。"""
 
-    def __init__(self, config_path="", seed=42, rounds=3, tmp=""):
+    def __init__(self, config_path="", seed=42, rounds=3, tmp="", delay=0.03):
         self.config_path = config_path
         self.seed = seed
         self.rounds = rounds
         self.tmp = tmp
+        self.delay = delay
         self.state = "IDLE"
         self.run_id = None
         self.events = []
@@ -67,7 +68,7 @@ class FakeAgent:
             if self.cancel_requested:      # 轮边界检查（同 BatchRunner 语义）
                 self.state = "CANCELLING"
                 break
-            time.sleep(0.03)
+            time.sleep(self.delay)
             self.live_events.append({"task_id": "T1", "round": r + 1,
                                      "strategy": "direct", "prompt": "p",
                                      "response": "r"})
@@ -101,11 +102,12 @@ class _Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.made = []
-        import threading
+        self.rounds = 3
+        self.delay = 0.03
 
         def factory(config_path="", seed=42):
-            a = FakeAgent(config_path=config_path, seed=seed, rounds=3,
-                          tmp=self.tmp)
+            a = FakeAgent(config_path=config_path, seed=seed,
+                          rounds=self.rounds, tmp=self.tmp, delay=self.delay)
             self.made.append(a)
             return a
 
@@ -181,19 +183,21 @@ class TestCancelAndResume(_Base):
         self.assertEqual(agents_for_victim, 0)
 
     def test_cancel_running_stops_at_round_boundary_and_resumes(self):
-        run_id = self.mgr.submit(RunSpec(rounds=6))
-        deadline = time.time() + 5
+        self.rounds, self.delay = 12, 0.15   # 慢速长跑，保证取消窗口
+        run_id = self.mgr.submit(RunSpec(rounds=12))
+        deadline = time.time() + 8
         while time.time() < deadline and not self.mgr.get_run(run_id)["steps_done"]:
-            time.sleep(0.05)
+            time.sleep(0.02)
         r = self.mgr.cancel(run_id)
         self.assertEqual(r["status"], "CANCELLING")
-        self.assertEqual(_wait_terminal(self.mgr, run_id), "CANCELLED")
+        self.assertEqual(_wait_terminal(self.mgr, run_id, timeout=10), "CANCELLED")
         agent = self.made[0]
         self.assertTrue(agent.cancel_requested)
-        self.assertLess(len(agent.live_events), 6)   # 没跑满
+        self.assertLess(len(agent.live_events), 12)   # 没跑满
         # 恢复：同一 run_id 重新入队，从检查点续跑语义（resume=True）
+        self.rounds, self.delay = 12, 0.02           # 恢复后快速跑完
         self.mgr.resume(run_id)
-        self.assertEqual(_wait_terminal(self.mgr, run_id), "COMPLETED")
+        self.assertEqual(_wait_terminal(self.mgr, run_id, timeout=10), "COMPLETED")
         self.assertEqual(self.made[1].run_id, run_id)
         self.assertTrue(self.made[1].resume_used)
         self.assertEqual(len(self.made), 2)
