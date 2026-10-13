@@ -83,10 +83,15 @@ html,body,.stApp{background:var(--bg)!important;color:var(--txt)!important;}
 .stApp::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
   opacity:.5;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .03 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
 .stApp>div{position:relative;z-index:1;}
-/* 主容器限宽居中（对齐预览稿阅读宽度，宽屏不再拉伸） */
+/* 主容器限宽居中（对齐预览稿阅读宽度，宽屏不再拉伸）；
+   顶部 6rem 给 Streamlit 固定工具栏让位（否则标题被遮一半） */
 .stApp .block-container, [data-testid="stMainBlockContainer"],
 div[data-testid="block-container"]{max-width:1100px!important;
-  margin:0 auto!important;padding:1.2rem 2rem 3rem!important;}
+  margin:0 auto!important;padding:6rem 2rem 3rem!important;}
+/* 左右玻璃卡等高（短卡不留下方空白） */
+.stHorizontalBlock{align-items:stretch!important;}
+.stHorizontalBlock>div{height:100%;}
+[data-testid="stVerticalBlockBorderWrapper"]{height:100%;}
 h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
 .sl-sub{color:var(--muted);font-size:14px;margin:2px 0 0;}
 .sl-meta{color:var(--muted);font-size:13px;}
@@ -299,7 +304,7 @@ tab0, tabH, tab2, tab4, tab5 = st.tabs([
 
 # ============================================================ Tab 0 总览
 with tab0:
-    with st.expander("系统架构与任务路由", expanded=False):
+    with st.expander("系统架构", expanded=True):
         st.caption("任务按风险语义分流到专业裁判；默认只观察不干预，"
                    "引导反馈为实验能力；独立评审官永远在闭环之外。")
         _h, _r = st.columns([1.05, 1])
@@ -320,6 +325,16 @@ with tab0:
             if "本地" in target_kind:
                 st.markdown(
                     '<span class="sl-pill on">已内置 Phi-3.5-mini · 无需配置</span>',
+                    unsafe_allow_html=True)
+                st.markdown(
+                    "<div class='sl-meta' style='line-height:2.15;margin-top:8px'>"
+                    "{i1} 被测模型　Phi-3.5-mini（NF4 量化）<br>"
+                    "{i2} 红方测试员　Qwen3-1.7B<br>"
+                    "{i3} 裁判　Qwen3Guard · 仅观察<br>"
+                    "{i4} 独立评审　StrongREJECT · 闭环之外</div>".format(
+                        i1=icon("cpu", 13, "#2f6feb"), i2=icon("play", 11, "#7556d8"),
+                        i3=icon("pulse", 13, "#b66a08"),
+                        i4=icon("shield", 13, "#16875d")),
                     unsafe_allow_html=True)
             else:
                 st.caption("填三项接入任意模型 · 密钥只经环境变量，不存盘")
@@ -406,16 +421,19 @@ with tab0:
                 for row in rows:
                     by_cat.setdefault(row.get("harm_category", ""), []).append(row)
                 cats = sorted(by_cat)
-                cat_labels = ["{}（{} 个场景）".format(
+                cat_labels = ["{}（{} 个）".format(
                     CATEGORY_ZH.get(c.replace("JBB:", ""), c), len(by_cat[c]))
                     for c in cats]
-                ci = st.selectbox("危害类别", range(len(cats)),
-                                  format_func=lambda i: cat_labels[i])
+                _sc1, _sc2 = st.columns([1, 1.6])
+                with _sc1:
+                    ci = st.selectbox("危害类别", range(len(cats)),
+                                      format_func=lambda i: cat_labels[i])
                 items = by_cat[cats[ci]]
-                si = st.selectbox(
-                    "场景", range(len(items)),
-                    format_func=lambda i: "{} ｜ {}".format(
-                        items[i]["task_id"], (items[i].get("goal") or "")[:44]))
+                with _sc2:
+                    si = st.selectbox(
+                        "场景", range(len(items)),
+                        format_func=lambda i: "{} ｜ {}".format(
+                            items[i]["task_id"], (items[i].get("goal") or "")[:30]))
                 scenario_id = items[si]["task_id"]
             rounds_v = st.slider(
                 "每个场景测试轮数", 1, 10, 3,
@@ -537,50 +555,46 @@ with tab0:
                 "$ 等待首轮对话…（排队 / 模型加载中，完成后逐轮显示在此）</div></div>",
                 unsafe_allow_html=True)
         else:
-            _d2, _d3 = st.columns([2.5, 1.5])
-            with _d2:
-                multi = a is not None and len(
-                    getattr(a, "trajectories", {}) or {}) > 1
-                blocks = []
-                for e in events[-40:]:
-                    jt = ("目标推进 {}".format(e["advancement"]) if e["advancement"]
-                          else "内容判定 {}".format(e["safety"]) if e["safety"]
-                          else "已记录")
-                    sg = ("r" if e["success"] else
-                          "a" if e["advancement"] == "PARTIAL"
-                          or e["safety"] == "Unsafe" else "g")
-                    tag = "［{}］".format(e.get("branch", "")) if multi else ""
-                    ans = str(e["response"])[:340]
-                    blocks.append(
-                        "<div class='t-round'><span class='sg {}'></span>{}R{} · {}{}"
-                        " · {}</div>"
-                        "<div class='t-q'><div class='t-role'>TESTER ▸</div>{}</div>"
-                        "<div class='t-a'><div class='t-role'>TARGET ▸</div>{}</div>"
-                        .format(sg, tag, e["round"],
-                                e["task_id"],
-                                STRATEGY_ZH.get(e["strategy"], e["strategy"]), jt,
-                                str(e["prompt"])[:240]
-                                .replace("&", "&amp;").replace("<", "&lt;"),
-                                (ans or "（空回答）")
-                                .replace("&", "&amp;").replace("<", "&lt;")))
-                st.markdown("<div class='term'><div class='term-body'>"
-                            + "".join(blocks) + "</div></div>",
-                            unsafe_allow_html=True)
-            with _d3:
-                st.markdown("<div class='sl-sec'>{}</div>".format(
-                    icon("tree", 15)), unsafe_allow_html=True)
-                seen = {}
-                for e in events:
-                    seen[e["round"]] = e
-                rnds = [{"round": r_, "strategy": e["strategy"],
-                         "signal": SIGNAL_OF_ADVANCEMENT.get(e["advancement"])
-                         or ("risk" if e["safety"] == "Unsafe" else
-                             "safe" if e["safety"] in ("Safe", None) else "warn"),
-                         "action": e["action"], "state": "decided"}
-                        for r_, e in sorted(seen.items())]
-                st.markdown(decision_path_tree(rnds, live=True,
-                                               progress=len(rnds)),
-                            unsafe_allow_html=True)
+            multi = a is not None and len(
+                getattr(a, "trajectories", {}) or {}) > 1
+            blocks = []
+            for e in events[-40:]:
+                jt = ("目标推进 {}".format(e["advancement"]) if e["advancement"]
+                      else "内容判定 {}".format(e["safety"]) if e["safety"]
+                      else "已记录")
+                sg = ("r" if e["success"] else
+                      "a" if e["advancement"] == "PARTIAL"
+                      or e["safety"] == "Unsafe" else "g")
+                tag = "［{}］".format(e.get("branch", "")) if multi else ""
+                ans = str(e["response"])[:340]
+                blocks.append(
+                    "<div class='t-round'><span class='sg {}'></span>{}R{} · {}{}"
+                    " · {}</div>"
+                    "<div class='t-q'><div class='t-role'>TESTER ▸</div>{}</div>"
+                    "<div class='t-a'><div class='t-role'>TARGET ▸</div>{}</div>"
+                    .format(sg, tag, e["round"],
+                            e["task_id"],
+                            STRATEGY_ZH.get(e["strategy"], e["strategy"]), jt,
+                            str(e["prompt"])[:240]
+                            .replace("&", "&amp;").replace("<", "&lt;"),
+                            (ans or "（空回答）")
+                            .replace("&", "&amp;").replace("<", "&lt;")))
+            st.markdown("<div class='term'><div class='term-body'>"
+                        + "".join(blocks) + "</div></div>",
+                        unsafe_allow_html=True)
+            st.markdown("<div class='sl-sec'>{}　决策路径</div>".format(
+                icon("tree", 15)), unsafe_allow_html=True)
+            seen = {}
+            for e in events:
+                seen[e["round"]] = e
+            rnds = [{"round": r_, "strategy": e["strategy"],
+                     "signal": SIGNAL_OF_ADVANCEMENT.get(e["advancement"])
+                     or ("risk" if e["safety"] == "Unsafe" else
+                         "safe" if e["safety"] in ("Safe", None) else "warn"),
+                     "action": e["action"], "state": "decided"}
+                    for r_, e in sorted(seen.items())]
+            st.markdown(decision_path_tree(rnds, live=True, progress=len(rnds)),
+                        unsafe_allow_html=True)
         if r["status"] in TERMINAL:
             if r["status"] == "FAILED":
                 st.error("运行失败：{}".format((r.get("error") or "")[:200]))
@@ -623,7 +637,33 @@ with tab0:
             max_step = st.slider("演示进度", 1, len(nodes),
                                  st.session_state.get("live_step", len(nodes)),
                                  key="live_step")
-            _c1, _c2, _c3 = st.columns([1, 2.5, 1.5])
+            blocks = []
+            for s in demo.steps[:max_step]:
+                adv = s.judge_output.metadata.get("advancement")
+                sig = s.judge_output.metadata.get("safety")
+                jt = ("目标推进 {}".format(adv) if adv
+                      else "内容判定 {}".format(sig) if sig else "已记录")
+                sg = ("r" if _ok(s) else
+                      "a" if adv == "PARTIAL" or sig == "Unsafe" else "g")
+                blocks.append(
+                    "<div class='t-round'><span class='sg {}'></span>R{} · {}"
+                    " · {}</div>"
+                    "<div class='t-q'><div class='t-role'>TESTER ▸</div>{}</div>"
+                    "<div class='t-a'><div class='t-role'>TARGET ▸</div>{}</div>"
+                    .format(sg, s.round_id + 1,
+                            STRATEGY_ZH.get(s.action.strategy, s.action.strategy),
+                            jt,
+                            s.action.prompt[:300]
+                            .replace("&", "&amp;").replace("<", "&lt;"),
+                            s.response.text[:420]
+                            .replace("&", "&amp;").replace("<", "&lt;")))
+            st.markdown("<div class='term'><div class='term-head'>"
+                        "<span class='dot'></span>DEMO · 1 个场景 · {} 轮"
+                        "<span class='right'>演示数据 · 非本次检测</span>"
+                        "</div><div class='term-body'>{}</div></div>".format(
+                            len(demo.steps), "".join(blocks)),
+                        unsafe_allow_html=True)
+            _c1, _c3 = st.columns([1, 2.3])
             with _c1:
                 st.markdown("**智能体状态坞**")
                 st.markdown(
@@ -646,35 +686,8 @@ with tab0:
                         active_domain=("goal" if demo_dom == "goal_compliance"
                                        else "content"),
                         active_role="judge"), unsafe_allow_html=True)
-            with _c2:
-                blocks = []
-                for s in demo.steps[:max_step]:
-                    adv = s.judge_output.metadata.get("advancement")
-                    sig = s.judge_output.metadata.get("safety")
-                    jt = ("目标推进 {}".format(adv) if adv
-                          else "内容判定 {}".format(sig) if sig else "已记录")
-                    sg = ("r" if _ok(s) else
-                          "a" if adv == "PARTIAL" or sig == "Unsafe" else "g")
-                    blocks.append(
-                        "<div class='t-round'><span class='sg {}'></span>R{} · {}"
-                        " · {}</div>"
-                        "<div class='t-q'><div class='t-role'>TESTER ▸</div>{}</div>"
-                        "<div class='t-a'><div class='t-role'>TARGET ▸</div>{}</div>"
-                        .format(sg, s.round_id + 1,
-                                STRATEGY_ZH.get(s.action.strategy, s.action.strategy),
-                                jt,
-                                s.action.prompt[:260]
-                                .replace("&", "&amp;").replace("<", "&lt;"),
-                                s.response.text[:380]
-                                .replace("&", "&amp;").replace("<", "&lt;")))
-                st.markdown("<div class='term'><div class='term-head'>"
-                            "<span class='dot'></span>DEMO · 1 个场景 · {} 轮"
-                            "<span class='right'>演示数据 · 非本次检测</span>"
-                            "</div><div class='term-body'>{}</div></div>".format(
-                                len(demo.steps), "".join(blocks)),
-                            unsafe_allow_html=True)
             with _c3:
-                st.markdown("<div class='sl-sec'>{}</div>".format(
+                st.markdown("<div class='sl-sec'>{}　决策路径</div>".format(
                     icon("tree", 15)), unsafe_allow_html=True)
                 demo_trig = next((s.round_id + 1 for s in demo.steps if _ok(s)), None)
                 st.markdown(decision_path_tree(
