@@ -200,12 +200,9 @@ export SAFELOOP_API_KEY="..."   # 可选：设置后要求 X-API-Key 头（比�
 #   POST /evaluations/{id}/cancel|resume
 # 注：本机 curl 需 --noproxy '*'（系统代理会拦 127.0.0.1）
 
-# v1.1 消融实验（roadmap A4；--dry-run 零 GPU 冒烟）
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY scripts/run_v11_ablation.py \
-    --conditions M0,M1 --tasks 20 --budget 5 --tag m_          # 记忆消融
-$PY scripts/run_v11_ablation.py --conditions S0,S1 --adaptive-q 200,300,400 \
-    --tasks 20 --budget 5 --tag s_                             # 调度消融（D(Q)/Yield）
-$PY scripts/run_v11_ablation.py --conditions A0,A1,A2,A3 --adaptive-q 300 --tag joint_
+# v1.1 消融实验（可选研究工具，按用户决策本期不跑；--dry-run 零 GPU 冒烟）
+#   $PY scripts/run_v11_ablation.py --conditions M0,M1 --tasks 20 --budget 5 --tag m_
+#   $PY scripts/run_v11_ablation.py --conditions A0,A1,A2,A3 --adaptive-q 300 --tag joint_
 # 中文题库重建（源 CSV：github.com/STAIR-BUPT/JailBench 的 JailBench_seed.csv，
 # 存 data/raw/jailbench_seed.csv；默认全量导入，--n N 可选跨类别抽样子集）：
 $PY scripts/build_safeloop_cn.py
