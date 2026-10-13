@@ -336,8 +336,7 @@ with _e:
     expert = st.toggle("专家模式", value=False,
                        help="显示研究指标、分支代号与原始任务编号")
 
-tab0, tabH, tab2, tab4, tab5 = st.tabs([
-    "总览", "运行历史", "轨迹回放", "风险发现", "评估报告"])
+tab0, tab2, tab5 = st.tabs(["总览", "轨迹回放", "评估报告"])
 
 # ============================================================ 中文演示脚本（与预览稿同源）
 from types import SimpleNamespace as _NS
@@ -531,18 +530,25 @@ with tab0:
                          "开启后报告使用 D(Q)/Yield 口径")
             est_calls = n_tasks * rounds_v * (2 if "对比检测" in mode else 1)
             lo, hi = int(est_calls * 0.7), int(est_calls * 1.5)
-            st.caption("预计目标模型调用 {} 次 · 约 {}".format(
-                est_calls,
+            st.caption("每场景 {} 轮 · 预计调用 {} 次 · 约 {}".format(
+                rounds_v, est_calls,
                 "{}-{}".format(
                     "{:.1f} 小时".format(lo / 60) if lo >= 90 else lo,
                     "{:.1f} 小时".format(hi / 60) if hi >= 90 else hi)))
 
-    bA, bB = st.columns([1.4, 1.6])
-    with bA:
-        start = st.button("开始安全体检", use_container_width=True, type="primary")
-    with bB:
-        sample = st.button("载入示例数据", use_container_width=True,
-                           help="在报告/回放/风险发现页加载内置演示数据，非现场运行")
+    with st.container(border=True):
+        _ab1, _ab2, _ab3 = st.columns([1.1, 1.2, 2.0])
+        with _ab1:
+            start = st.button("开始安全体检", use_container_width=True,
+                              type="primary")
+        with _ab2:
+            sample = st.button("载入示例数据", use_container_width=True,
+                               help="在报告/回放/风险发现区加载内置演示数据，非现场运行")
+        with _ab3:
+            st.markdown(
+                "<div class='sl-meta' style='display:flex;align-items:center;"
+                "height:100%'>运行期间可自由浏览本页各区块 · 离开再回来进度不丢</div>",
+                unsafe_allow_html=True)
 
     if sample:
         st.session_state.agent = None
@@ -762,9 +768,58 @@ with tab0:
                                demo_trig <= max_step else None)),
                 unsafe_allow_html=True)
 
+    # ------------------------------------------------ 风险发现（预览稿同位）
+    st.markdown("<div class='sl-sec'>{}　风险发现</div>".format(
+        icon("pulse", 16)), unsafe_allow_html=True)
+    if not report:
+        st.markdown(_empty("pulse", "暂无评估数据",
+                           "完成一次检测（或载入示例数据）后，这里汇总风险发现比例、"
+                           "首次触发轮次与类别分布。"),
+                    unsafe_allow_html=True)
+    else:
+        ov, m = report["overview"], report["metrics"]["user_layer"]
+        asr = asr_at_budget(m, (report.get("configuration") or {}).get(
+            "budget_per_task"))
+        grade, color = risk_grade(asr)
+        vcolor = {"red": "red", "amber": "red", "green": "green",
+                  "gray": ""}[color]
+        turning = sum(1 for t in pool if t.steps and not _ok(t.steps[0])
+                      and any(_ok(s) for s in t.steps))
+        st.markdown(
+            "<div class='sl-kpis'>"
+            "<div class='sl-kpi'><div class='v {vc}'>{r}<small>/{t}</small></div>"
+            "<div class='sl-cap'>发现风险场景</div></div>"
+            "<div class='sl-kpi'><div class='v {vc}'>{a}</div>"
+            "<div class='sl-cap'>风险发现率（参考等级：{g}）</div></div>"
+            "<div class='sl-kpi'><div class='v'>{c}<small> 轮</small></div>"
+            "<div class='sl-cap'>平均首次触发轮次</div></div>"
+            "<div class='sl-kpi'><div class='v'>{s}</div>"
+            "<div class='sl-cap'>探索效率 AUC-B {au}</div></div></div>".format(
+                vc=vcolor, r=ov["risk_tasks"], t=ov["total_tasks"],
+                a="{:.0%}".format(asr or 0), g=grade,
+                c="{:.1f}".format(m.get("mean_ctts") or 0),
+                s=stars(m.get("auc_b")), au=m.get("auc_b")),
+            unsafe_allow_html=True)
+        if turning:
+            st.info("{} 个场景首轮表现安全，多轮测试后才暴露风险——"
+                    "这正是多轮体检的价值。".format(turning))
+        dist = {CATEGORY_ZH.get(k.replace("JBB:", ""), k): v
+                for k, v in (report.get("risk_distribution") or {}).items()}
+        if dist:
+            dmax = max(dist.values()) or 1
+            items = sorted(dist.items(), key=lambda x: -x[1])
+            st.markdown("<div class='sl-sec' style='font-size:15px'>{}　风险类别分布"
+                        "</div>".format(icon("alert", 14)), unsafe_allow_html=True)
+            st.markdown("".join(
+                "<div class='sl-bar-row'><div class='sl-bar-name'>{}</div>"
+                "<div class='sl-bar' style='width:{}px;background:{}'></div>"
+                "<div class='sl-bar-n'>{}</div></div>".format(
+                    k, max(14, int(v / dmax * 230)),
+                    CAT_COLORS[i % len(CAT_COLORS)], v)
+                for i, (k, v) in enumerate(items)),
+                unsafe_allow_html=True)
 
-# ============================================================ Tab 运行历史
-with tabH:
+    # ------------------------------------------------ 运行历史（预览稿同位）
     st.markdown("<div class='sl-sec'>{}　运行历史"
                 "<span class='sl-meta' style='font-weight:400'>（重启不丢，"
                 "含导入的旧 run）</span></div>".format(icon("history", 16)),
@@ -772,7 +827,7 @@ with tabH:
     runs = mgr.list_runs(30)
     if not runs:
         st.markdown(_empty("history", "还没有历史运行",
-                           "在「总览」开始一次检测后出现在这里；<br>"
+                           "开始一次检测后出现在这里；<br>"
                            "过去保存的报告会在首次启动时自动导入。"),
                     unsafe_allow_html=True)
     for r in runs:
@@ -828,8 +883,8 @@ with tabH:
                     except Exception as exc:  # noqa: BLE001
                         st.error("无法加载该 run 的轨迹：{}".format(str(exc)[:120]))
     if runs:
-        st.caption("「查看」加载该 run 的真实轨迹与报告，在「轨迹回放 / 风险发现 / "
-                   "评估报告」标签页展示；导入的历史 run 可查看保留的报告。")
+        st.caption("「查看」加载该 run 的真实轨迹与报告，在「轨迹回放 / 评估报告」"
+                   "标签页展示；导入的历史 run 可查看保留的报告。")
 
 
 # ============================================================ Tab 轨迹回放
@@ -883,59 +938,6 @@ with tab2:
         st.markdown("<div class='term'><div class='term-body' style="
                     "'max-height:none'>{}</div></div>".format("".join(blocks)),
                     unsafe_allow_html=True)
-
-
-# ============================================================ Tab 风险发现
-with tab4:
-    st.markdown("<div class='sl-sec'>{}　风险发现总览</div>".format(
-        icon("pulse", 16)), unsafe_allow_html=True)
-    if not report:
-        st.markdown(_empty("pulse", "暂无评估数据",
-                           "完成一次检测后，这里汇总风险发现比例、"
-                           "首次触发轮次与类别分布。"),
-                    unsafe_allow_html=True)
-    else:
-        ov, m = report["overview"], report["metrics"]["user_layer"]
-        asr = asr_at_budget(m, (report.get("configuration") or {}).get(
-            "budget_per_task"))
-        grade, color = risk_grade(asr)
-        vcolor = {"red": "red", "amber": "red", "green": "green",
-                  "gray": ""}[color]
-        turning = sum(1 for t in pool if t.steps and not _ok(t.steps[0])
-                      and any(_ok(s) for s in t.steps))
-        st.markdown(
-            "<div class='sl-kpis'>"
-            "<div class='sl-kpi'><div class='v {vc}'>{r}<small>/{t}</small></div>"
-            "<div class='sl-cap'>发现风险场景</div></div>"
-            "<div class='sl-kpi'><div class='v {vc}'>{a}</div>"
-            "<div class='sl-cap'>风险发现率（参考等级：{g}）</div></div>"
-            "<div class='sl-kpi'><div class='v'>{c}<small> 轮</small></div>"
-            "<div class='sl-cap'>平均首次触发轮次</div></div>"
-            "<div class='sl-kpi'><div class='v'>{s}</div>"
-            "<div class='sl-cap'>探索效率 AUC-B {au}</div></div></div>".format(
-                vc=vcolor, r=ov["risk_tasks"], t=ov["total_tasks"],
-                a="{:.0%}".format(asr or 0), g=grade,
-                c="{:.1f}".format(m.get("mean_ctts") or 0),
-                s=stars(m.get("auc_b")), au=m.get("auc_b")),
-            unsafe_allow_html=True)
-        if turning:
-            st.info("{} 个场景首轮表现安全，多轮测试后才暴露风险——"
-                    "这正是多轮体检的价值。".format(turning))
-        dist = {CATEGORY_ZH.get(k.replace("JBB:", ""), k): v
-                for k, v in (report.get("risk_distribution") or {}).items()}
-        if dist:
-            dmax = max(dist.values()) or 1
-            items = sorted(dist.items(), key=lambda x: -x[1])
-            st.markdown("<div class='sl-sec' style='font-size:15px'>{}　风险类别分布"
-                        "</div>".format(icon("alert", 14)), unsafe_allow_html=True)
-            st.markdown("".join(
-                "<div class='sl-bar-row'><div class='sl-bar-name'>{}</div>"
-                "<div class='sl-bar' style='width:{}px;background:{}'></div>"
-                "<div class='sl-bar-n'>{}</div></div>".format(
-                    k, max(14, int(v / dmax * 230)),
-                    CAT_COLORS[i % len(CAT_COLORS)], v)
-                for i, (k, v) in enumerate(items)),
-                unsafe_allow_html=True)
 
 
 # ============================================================ Tab 评估报告
