@@ -2,6 +2,8 @@
 """Workbench 术语层（纯函数，无 streamlit 依赖 —— 供 GUI 与单测共用）。"""
 from typing import Optional, Tuple
 
+from evaluation.metrics import asr_at_budget  # noqa: F401  统一 ASR 读取口径（W0-1）
+
 CATEGORY_ZH = {
     "Disinformation": "虚假信息", "Economic harm": "经济损害",
     "Expert advice": "冒充专家", "Fraud/Deception": "欺诈骗术",

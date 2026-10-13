@@ -75,10 +75,13 @@ class BatchRunner:
         provenance: Optional[dict] = None,
         base_seed: int = 42,
         on_step=None,
+        should_cancel=None,
     ) -> None:
         """coordinator_factory(protocol) 与 reward_factory(budget) 每条件新建。
 
         on_step(step, slot)：每轮落步后回调（UI 流式刷新用；回调异常不影响运行）。
+        should_cancel() -> bool：每轮边界检查；为真时本轮后不再发起任何模型调用，
+        未完成 slot 标 stop_reason="cancelled"（优雅取消：保存已有结果后停止）。
         """
         self.coordinator_factory = coordinator_factory
         self.red_agent = red_agent
@@ -91,6 +94,8 @@ class BatchRunner:
         self.provenance = provenance or {}
         self.base_seed = base_seed
         self.on_step = on_step
+        self.should_cancel = should_cancel
+        self.cancelled = False
 
     # ------------------------------------------------------------------
     def run(
@@ -149,6 +154,15 @@ class BatchRunner:
                     for s in slots])
 
         for _round in range(max_budget):
+            # 优雅取消（W0-3）：轮边界检查——不再发起后续轮次的任何模型调用，
+            # 当前已完成的轮次与轨迹照常落盘（"安全完成当前调用后停止"）
+            if self.should_cancel is not None and self.should_cancel():
+                self.cancelled = True
+                for s in slots:
+                    if s.state.stop_reason is None:
+                        s.state.stop_reason = "cancelled"
+                logger.info("cancel requested at round boundary %d", _round)
+                break
             # 按 slot 自身 round_id 过滤：续跑时已完成轮次自然跳过
             active = [s for s in slots
                       if not s.state.done and s.state.round_id == _round]

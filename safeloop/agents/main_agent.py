@@ -31,8 +31,8 @@ from utils.io import load_yaml
 
 logger = logging.getLogger("safeloop.main_agent")
 
-STATES = ("IDLE", "PLANNING", "READY", "RUNNING", "EVALUATING", "ANALYZING",
-          "REPORTING", "COMPLETED", "FAILED", "CANCELLED")
+STATES = ("IDLE", "PLANNING", "READY", "RUNNING", "CANCELLING", "EVALUATING",
+          "ANALYZING", "REPORTING", "COMPLETED", "FAILED", "CANCELLED")
 
 MODES = ("standard", "guided", "compare")
 
@@ -178,6 +178,9 @@ class SafeLoopMainAgent:
         self.report: Optional[Dict] = None
         # 实况流式缓冲：每完成一轮，UI 可直接读取渲染
         self.live_events: List[Dict] = []
+        self.cancel_requested = False   # 真取消：引擎在轮边界检查（W0-3）
+        self._resume = False
+        self.is_demo = False            # replay_loader 标记（演示数据 vs 真实 run）
 
     # -------------------------------------------------------------- events
     def _emit(self, kind: str, **data) -> None:
@@ -200,11 +203,17 @@ class SafeLoopMainAgent:
         self._set_state("READY")
         return self.plan
 
-    def run(self) -> Dict:
-        """执行（RUNNING→EVALUATING→ANALYZING→REPORTING→COMPLETED）。"""
+    def run(self, resume: bool = False) -> Dict:
+        """执行（RUNNING→EVALUATING→ANALYZING→REPORTING→COMPLETED/CANCELLED）。
+
+        resume=True 时从 outputs/checkpoints/{run_id}_{branch}.json 续跑
+        （无检查点则冷启动）；取消（cancel()）在轮边界生效：不再发起后续模型
+        调用，已完成结果照常评估与出报告（报告 configuration.cancelled=True）。
+        """
         from experiments.stage1br import (PlainCoordinator, build_branch_stack,
                                           _split_domains)
         assert self.plan is not None
+        self._resume = resume
         cfg = load_yaml(self.plan.config_path)
         tasks = load_tasks(cfg)
         if self.plan.request.scenario_ids:
@@ -225,27 +234,37 @@ class SafeLoopMainAgent:
         self.trajectories = {}
         for br in self.plan.branches:
             self._run_branch(cfg, tasks, br)
+            if self.cancel_requested:
+                break   # 分支级取消：跳过剩余分支，保留已完成分支结果
 
-        self._set_state("EVALUATING")
-        evaluator = build_evaluator(cfg)
-        from evaluation.offline_evaluator import OfflineEvaluator
-        for name, trajs in self.trajectories.items():
-            offline = OfflineEvaluator(evaluator)
-            offline.disagreements = []
-            offline.evaluate_all(trajs, "{}_{}".format(self.run_id, name))
-            self._emit("evaluator_completed", branch=name, n=len(trajs))
+        if self.trajectories:
+            self._set_state("EVALUATING")
+            evaluator = build_evaluator(cfg)
+            from evaluation.offline_evaluator import OfflineEvaluator
+            for name, trajs in self.trajectories.items():
+                offline = OfflineEvaluator(evaluator)
+                offline.disagreements = []
+                offline.evaluate_all(trajs, "{}_{}".format(self.run_id, name))
+                self._emit("evaluator_completed", branch=name, n=len(trajs))
+                if self.cancel_requested:
+                    break
 
         self._set_state("ANALYZING")
         from safeloop.skills.report import ReportSkill
         self._set_state("REPORTING")
-        self.report = ReportSkill().build(self.run_id, self.plan,
-                                            self.trajectories)
+        if self.trajectories:
+            self.report = ReportSkill().build(self.run_id, self.plan,
+                                              self.trajectories)
+            if self.cancel_requested:
+                self.report.setdefault("configuration", {})["cancelled"] = True
         os.makedirs("outputs/reports", exist_ok=True)
         path = "outputs/reports/{}_report.json".format(self.run_id)
-        json.dump(self.report, open(path, "w", encoding="utf-8"),
-                  ensure_ascii=False, indent=2)
-        self._emit("report_ready", path=path, summary=self.report["overview"]["answer"])
-        self._set_state("COMPLETED")
+        if self.report is not None:
+            json.dump(self.report, open(path, "w", encoding="utf-8"),
+                      ensure_ascii=False, indent=2)
+        self._emit("report_ready", path=path,
+                   summary=(self.report or {}).get("overview", {}).get("answer", ""))
+        self._set_state("CANCELLED" if self.cancel_requested else "COMPLETED")
         return self.report
 
     # -------------------------------------------------------------- branch
@@ -282,6 +301,9 @@ class SafeLoopMainAgent:
             return RewardFunction(RewardConfig(**(cfg.get("reward", {}) or {})), budget)
 
         cond = "{}_{}".format(self.run_id, br["name"])
+        os.makedirs("outputs/checkpoints", exist_ok=True)
+        ckpt_path = "outputs/checkpoints/{}.json".format(cond)
+
         def _on_step(step, slot):
             self.live_events.append({
                 "branch": br["name"],
@@ -303,6 +325,7 @@ class SafeLoopMainAgent:
             target=target, judge=judge, memory=build_memory(cfg),
             reward_factory=reward_factory, feedback_builder=fb_builder,
             model_manager=mm, base_seed=self.seed, on_step=_on_step,
+            should_cancel=(lambda: self.cancel_requested),
             provenance={"run_id": self.run_id, "branch": br["name"],
                         "feedback_mode": br["mode"], "mode": self.plan.request.mode,
                         "main_agent": self.version, "seed": self.seed})
@@ -316,17 +339,34 @@ class SafeLoopMainAgent:
             initial_seed_policy="fixed_direct",
             metadata={"feedback_mode": br["mode"]})
         self._emit("branch_started", branch=br["name"], n_tasks=len(tasks))
-        trajs = batch.run(tasks, {br["name"]: protocol})[br["name"]]
+        trajs = batch.run(
+            tasks, {br["name"]: protocol},
+            trajectory_store=TrajectoryStore(),
+            checkpoint_path=ckpt_path,
+            resume=self._resume)[br["name"]]
         self.trajectories[br["name"]] = trajs
-        self._emit("branch_completed", branch=br["name"], n=len(trajs))
+        self._emit("branch_completed", branch=br["name"], n=len(trajs),
+                   cancelled=batch.cancelled)
 
     # -------------------------------------------------------------- misc
     def cancel(self) -> None:
-        if self.state in ("RUNNING", "EVALUATING", "ANALYZING", "REPORTING"):
+        """请求取消（真取消，W0-3）：置 cancel_requested，引擎在轮边界停下。
+
+        READY（未开始）直接 CANCELLED；活动态 → CANCELLING，run() 收尾时置
+        CANCELLED。当前正在进行的单次模型调用会完成或超时后才生效（远端请求
+        无法撤回，可能已产生费用）。
+        """
+        self.cancel_requested = True
+        if self.state == "READY":
             self._set_state("CANCELLED")
+        elif self.state in ("PLANNING", "RUNNING", "CANCELLING", "EVALUATING",
+                            "ANALYZING", "REPORTING"):
+            if self.state != "CANCELLING":
+                self._set_state("CANCELLING")
 
     def status(self) -> Dict:
         return {"run_id": self.run_id, "state": self.state,
+                "cancel_requested": self.cancel_requested,
                 "n_events": len(self.events),
                 "branches": {k: len(v) for k, v in self.trajectories.items()},
                 "report_ready": self.report is not None}

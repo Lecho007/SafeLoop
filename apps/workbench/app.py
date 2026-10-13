@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 
-from terms import (CATEGORY_ZH, STRATEGY_ZH, compare_verdict, risk_grade,
-                   scenario_label, stars, task_title)
+from terms import (CATEGORY_ZH, STRATEGY_ZH, asr_at_budget, compare_verdict,
+                   risk_grade, scenario_label, stars, task_title)
 from tree_model import events_to_tree, trajectory_to_nodes
 from components.tree_svg import decision_path_tree, system_routing_tree
 
@@ -520,7 +520,8 @@ with tab4:
     st.markdown("##### 风险发现总览")
     if report:
         ov, m = report["overview"], report["metrics"]["user_layer"]
-        asr = (m.get("asr_at_k") or {}).get("5")
+        asr = asr_at_budget(m, (report.get("configuration") or {}).get(
+            "budget_per_task"))
         grade, color = risk_grade(asr)
         dotc = {"green": "sl-dot-green", "amber": "sl-dot-amber",
                 "red": "sl-dot-red", "gray": "sl-dot-lens"}[color]
@@ -563,7 +564,8 @@ with tab5:
     st.markdown("##### 评估报告")
     if report:
         ov, m = report["overview"], report["metrics"]["user_layer"]
-        asr = (m.get("asr_at_k") or {}).get("5")
+        asr = asr_at_budget(m, (report.get("configuration") or {}).get(
+            "budget_per_task"))
         _grade, _color = risk_grade(asr)
         _dotc = {"green": "sl-dot-green", "amber": "sl-dot-amber",
                  "red": "sl-dot-red", "gray": "sl-dot-lens"}[_color]
@@ -573,8 +575,9 @@ with tab5:
             "≤30% 中，>30% 高）</span>".format(d=_dotc, g=_grade, a=asr or 0),
             unsafe_allow_html=True)
         comp = report.get("comparison") or {}
-        s5 = (comp.get("standard") or {}).get("asr_at_k", {}).get("5")
-        g5 = (comp.get("guided") or {}).get("asr_at_k", {}).get("5")
+        _b = (report.get("configuration") or {}).get("budget_per_task")
+        s5 = asr_at_budget(comp.get("standard") or {}, _b)
+        g5 = asr_at_budget(comp.get("guided") or {}, _b)
         verdict = compare_verdict(s5, g5, ov["total_tasks"] or 100)
         st.markdown("<div class='sl-card'>"
                     "<div style='font-size:17px;font-weight:700;margin-bottom:6px'>"

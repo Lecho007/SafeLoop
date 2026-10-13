@@ -8,8 +8,8 @@ import json
 from collections import Counter
 from typing import Dict
 
-from evaluation.metrics import (asr_at_k, auc_b, condition_summary, ctts,
-                                mean_ctts)
+from evaluation.metrics import (asr_at_k, asr_at_budget, auc_b,
+                                condition_summary, ctts, mean_ctts)
 
 
 class ReportSkill:
@@ -40,7 +40,8 @@ class ReportSkill:
         answer = self._answer(plan, len(primary), len(risk_tasks), cats, mode)
         comparison = None
         if std and gui:
-            comparison = self._compare(std, gui)
+            comparison = self._compare(std, gui, plan.request.budget_per_task)
+        budget = plan.request.budget_per_task
 
         return {
             "run_id": run_id,
@@ -49,8 +50,10 @@ class ReportSkill:
                          "total_tasks": len(primary),
                          "mode": mode,
                          "target": plan.request.target_model},
-            "metrics": {"user_layer": {k: m.get(k) for k in (
-                            "asr_at_k", "auc_b", "mean_ctts")},
+            "metrics": {"user_layer": {"asr_at_k": m.get("asr_at_k"),
+                                       "asr_at_budget": asr_at_budget(m, budget),
+                                       "auc_b": m.get("auc_b"),
+                                       "mean_ctts": m.get("mean_ctts")},
                         "research_layer": {k: m.get(k) for k in (
                             "strategy_switch_rate", "harmful_switch_rate",
                             "effective_strategy_switch_rate")}},
@@ -119,11 +122,16 @@ class ReportSkill:
         return base + scope
 
     @staticmethod
-    def _compare(std, gui) -> Dict:
-        b = 5
-        ms, mg = condition_summary(std, b), condition_summary(gui, b)
-        return {"standard": {k: ms.get(k) for k in ("asr_at_k", "auc_b", "mean_ctts")},
-                "guided": {k: mg.get(k) for k in ("asr_at_k", "auc_b", "mean_ctts")},
+    def _compare(std, gui, budget=5) -> Dict:
+        ms, mg = condition_summary(std, budget), condition_summary(gui, budget)
+        return {"standard": {"asr_at_k": ms.get("asr_at_k"),
+                             "asr_at_budget": asr_at_budget(ms, budget),
+                             "auc_b": ms.get("auc_b"),
+                             "mean_ctts": ms.get("mean_ctts")},
+                "guided": {"asr_at_k": mg.get("asr_at_k"),
+                           "asr_at_budget": asr_at_budget(mg, budget),
+                           "auc_b": mg.get("auc_b"),
+                           "mean_ctts": mg.get("mean_ctts")},
                 "note": ("Judge feedback 的作用需按域解读：详见 1B-R 研究结论——"
                          "content 域 HSR 改善但 ASR 未必提升；证据随轨迹提供。")}
 

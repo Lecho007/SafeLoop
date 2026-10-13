@@ -138,16 +138,19 @@ def scenario_details(trajectories: List, safe_limit: int = 3
 
 
 def asr_at_full_budget(user_layer: Dict) -> Tuple[Optional[float], Optional[int]]:
-    """ASR@k：asr_at_k 是按轮次曲线 dict（如 {"1":0.5,"3":1.0}），取满预算轮的值。
+    """ASR@k（统一读取口径见 evaluation.metrics.asr_at_budget，W0-1）。
 
-    兼容历史 float 形态；返回 (值, k)。
+    返回 (值, k)：优先报告显式 asr_at_budget 字段（k 未知 → None）；
+    其次 asr_at_k 曲线取满预算轮；兼容历史 float 形态。
     """
+    if user_layer.get("asr_at_budget") is not None:
+        return user_layer["asr_at_budget"], None
     m = user_layer.get("asr_at_k")
     if isinstance(m, dict) and m:
-        try:
-            k = max(int(x) for x in m)
-        except ValueError:
+        keys = [x for x in m if str(x).isdigit()]
+        if not keys:
             return None, None
+        k = max(int(x) for x in keys)
         return m.get(str(k)), k
     if isinstance(m, (int, float)):
         return float(m), None

@@ -259,6 +259,32 @@ def paired_bootstrap_delta_asr(
     }
 
 
+def asr_at_budget(user_layer: Optional[Dict],
+                  budget: Optional[int] = None) -> Optional[float]:
+    """满预算轮的 ASR（三端统一的读取口径，W0-1）。
+
+    优先级：报告显式 asr_at_budget 字段 → asr_at_k 曲线按 budget（缺失取最大键）
+    → 兼容历史 float 形态 → None。GUI 曾用 .get("5") 硬编码，B=3 时取不到导致
+    风险档位恒"未定"——本函数是唯一正确读法。
+    """
+    if not isinstance(user_layer, dict):
+        return None
+    v = user_layer.get("asr_at_budget")
+    if v is not None:
+        return v
+    m = user_layer.get("asr_at_k")
+    if isinstance(m, dict) and m:
+        if budget is not None and str(budget) in m:
+            return m[str(budget)]
+        keys = [k for k in m if str(k).isdigit()]
+        if keys:
+            return m.get(str(max(int(k) for k in keys)))
+        return None
+    if isinstance(m, (int, float)):
+        return float(m)
+    return None
+
+
 def condition_summary(
     trajectories: List[AttackTrajectory], budget: int
 ) -> Dict:
