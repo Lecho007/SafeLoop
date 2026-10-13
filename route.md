@@ -460,6 +460,27 @@ per-task cap、决策留痕）经 BatchRunner round_selector 挂钩接入（默�
 
 测试 194 项全绿；新提交：2949995 / ade75fd / d05287a / 34ad275 / 702d0d6。
 
+### 4.25 前端换代：Vue 3 + Element Plus 完全替换 Streamlit（2026-10-13）
+
+用户决策：预览稿样式定稿后，以 Vue 3 + Vite + Element Plus + Pinia 重写 Web 前端
+（apps/web），**Streamlit 工作台（apps/workbench）整体退役删除**。
+
+- 架构收敛为单进程单端口：FastAPI 同时服务 REST API 与 SPA 静态文件
+  （uvicorn → http://127.0.0.1:8712 即产品）；CLI 继续作为独立入口；
+- 组件：RunTerminal（深色作战室终端，live/演示/回放共用）、DecisionTree
+  （自 tree_svg.py 1:1 移植 JS）、RiskFindings（渐变 KPI + 类别分布）、
+  HistoryList（停止/续跑/查看）、Overview（双卡向导 el-segmented 胶囊 +
+  el-slider + 高级折叠，中文演示剧本 demo.js 与预览稿同源）、ReplayView、
+  ReportView（人话结论）；2s 轮询 /evaluations/{id}/live；
+- 后端新增：GET /evaluations/{id}/live（实时对话流）、GET /suite（任务集
+  轻量行）、/trajectories 补 category；SPA 静态托管（dist 存在才挂载）；
+- 视觉系统（极光底 + 玻璃卡 + 终端）自 preview_v3 1:1 平移为 styles.css，
+  Element Plus 主题变量对齐；dist 产物入库（免构建即可运行）；
+- terms 源头统一 safeloop/skills/terms（GUI 垫片删除）；tree_model 随 GUI
+  退役（决策树逻辑已移 JS）；tests 188 项全绿（-6 GUI 专属，含 tree_model）。
+
+提交：96d6c3b 之后（本轮）。
+
 ## 5. 目录结构（模块直接位于 SafeLoop 主目录）
 
 ```

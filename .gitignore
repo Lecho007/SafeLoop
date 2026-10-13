@@ -15,3 +15,6 @@ data/calibration/
 # Python
 __pycache__/
 *.pyc
+
+# Vue 前端
+apps/web/node_modules/

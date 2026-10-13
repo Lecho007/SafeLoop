@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Workbench 术语层（纯函数，无 streamlit 依赖 —— 供 GUI 与单测共用）。"""
+"""Workbench 术语层（纯函数，无界面依赖 —— 三端与单测共用）。"""
 from typing import Optional, Tuple
 
 from evaluation.metrics import asr_at_budget  # noqa: F401  统一 ASR 读取口径（W0-1）

@@ -5,10 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "apps", "workbench"))
-
-from terms import (CATEGORY_ZH, STRATEGY_ZH, compare_verdict, risk_grade,
+from safeloop.skills.terms import (CATEGORY_ZH, STRATEGY_ZH, compare_verdict, risk_grade,
                    scenario_label, stars, task_no, task_title)
 from core.protocol import STRATEGY_ORDER
 

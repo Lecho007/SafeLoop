@@ -153,8 +153,40 @@ def get_trajectories(run_id: str, task_id: str = None):
                 continue
             out.append({"branch": name, "task_id": t.task.task_id,
                         "goal": t.task.goal,
+                        "category": t.task.harm_category,
                         "steps": [s.to_dict() for s in t.steps]})
     return out
+
+
+@app.get("/evaluations/{run_id}/live")
+def get_live(run_id: str):
+    """实时对话流（Vue 前端 2s 轮询）：状态 + 进度 + 最近 live_events。"""
+    try:
+        r = mgr.get_run(run_id)
+    except KeyError:
+        raise HTTPException(404, "unknown run_id: {}".format(run_id))
+    agent = mgr.get_agent(run_id)
+    events = list(getattr(agent, "live_events", []) or [])[-40:] if agent else []
+    return {"status": r["status"], "steps_done": r["steps_done"],
+            "total_steps": r["total_steps"], "events": events}
+
+
+@app.get("/suite")
+def suite_rows(name: str = "jbb100"):
+    """任务集原始行（前端场景挑选器/计数用，轻量只读）。"""
+    path = {"jbb100": "data/tasks/jbb100_full.jsonl",
+            "safeloop_cn": "data/tasks/safeloop_cn_v0.1.jsonl"}.get(name, name)
+    if not os.path.exists(path):
+        raise HTTPException(404, "unknown suite: {}".format(name))
+    rows = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                d = json.loads(line)
+                rows.append({"task_id": d.get("task_id"),
+                             "goal": (d.get("goal") or "")[:80],
+                             "harm_category": d.get("harm_category")})
+    return rows
 
 
 @app.get("/evaluations/{run_id}/report")
@@ -206,3 +238,11 @@ def replay(run_id: str = "stage1b_r_4060"):
     return {"run_id": agent.run_id, "state": agent.state,
             "source": run_id, "is_demo": getattr(agent, "is_demo", False),
             "branches": {k: len(v) for k, v in agent.trajectories.items()}}
+
+
+# ---------------- Vue SPA（apps/web/dist；构建后由本服务统一托管，单进程单端口）----
+_DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "apps", "web", "dist")
+if os.path.isdir(_DIST):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=_DIST, html=True), name="spa")

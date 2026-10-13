@@ -187,7 +187,7 @@ PYTHONPATH=. $PY apps/cli/safeloop_cli.py api-eval \
 
 # ================= SafeLoop v1.0 作品层（2026-09-25，d72323c）=================
 # Workbench GUI（浏览器四页工作台：输入→多智能体运行视图→轨迹证据链→报告）
-PYTHONPATH=. $PY -m streamlit run apps/workbench/app.py --server.port 8510
+PYTHONPATH=. $PY -m uvicorn apps.api.server:app --host 127.0.0.1 --port 8712 # Vue3 SPA + API 单进程（浏览器开 http://127.0.0.1:8712）
 # 浏览器打开 http://localhost:8510 —— 默认回放 1B-R 预跑数据（秒级）；
 # 也可选"现场真跑（小子集）"。
 

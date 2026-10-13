@@ -22,9 +22,6 @@ from typing import Dict, List, Optional, Tuple
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
-_WORKBENCH = os.path.join(_REPO, "apps", "workbench")
-if _WORKBENCH not in sys.path:
-    sys.path.insert(0, _WORKBENCH)
 os.chdir(_REPO)
 
 from rich.console import Console
@@ -34,7 +31,8 @@ from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.table import Table
 from rich.text import Text
 
-from terms import CATEGORY_ZH, STRATEGY_ZH, compare_verdict, risk_grade, stars
+from safeloop.skills.terms import (CATEGORY_ZH, STRATEGY_ZH, asr_at_budget,  # noqa: F401
+                                   compare_verdict, risk_grade, stars)
 from safeloop.skills.transcript import (MODE_ZH, build_transcript,  # noqa: F401
                                         e_short, verdict_short)
 SCOPE_ZH = {"sample": "抽样测试", "full": "完整测试", "single": "单场景测试"}
