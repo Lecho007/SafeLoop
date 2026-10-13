@@ -241,8 +241,11 @@ class RunManager:
         return self._agents.get(run_id)
 
     def set_reviewed(self, run_id: str, reviewed: bool = True) -> None:
-        """高风险案例人工复核标记（roadmap P3）。"""
+        """高风险案例人工复核标记（roadmap P3）：互斥写入 reviewed/unreviewed。"""
         with self._lock:
+            self._db.execute(
+                "DELETE FROM artifacts WHERE run_id=?"
+                " AND kind IN ('reviewed','unreviewed')", (run_id,))
             self._db.execute(
                 "INSERT OR REPLACE INTO artifacts(run_id,kind,path) VALUES(?,?,?)",
                 (run_id, "reviewed" if reviewed else "unreviewed", "-"))

@@ -10,6 +10,7 @@ export default defineConfig({
       '/runs': 'http://127.0.0.1:8712',
       '/replay': 'http://127.0.0.1:8712',
       '/targets': 'http://127.0.0.1:8712',
+      '/suite': 'http://127.0.0.1:8712',
     },
   },
   build: { outDir: 'dist', assetsDir: 'assets' },

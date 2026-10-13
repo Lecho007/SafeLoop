@@ -13,6 +13,7 @@ const ICONS = {
   tree: '<path d="M12 3v4M6 21v-4M18 21v-4M12 13v4M6 13h12"/><circle cx="12" cy="9" r="2"/><circle cx="6" cy="15" r="2"/><circle cx="18" cy="15" r="2"/><circle cx="12" cy="19" r="2"/>',
   history: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   download: '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/>',
+  key: '<circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M17 17l2-2M14.5 14.5l2-2"/>',
 }
 
 export function icon(name, size = 16, extra = '') {

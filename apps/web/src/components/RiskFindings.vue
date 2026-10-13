@@ -5,15 +5,17 @@
     <template v-else>
       <div class="kpis">
         <div class="glass kpi">
-          <div class="v" :class="vClass">{{ report.overview.risk_tasks }}<small>/{{ report.overview.total_tasks }}</small></div>
+          <div class="v" :class="vClass"><CountNum :value="report.overview.risk_tasks" /><small>/{{ report.overview.total_tasks }}</small></div>
           <div class="c">发现风险场景</div>
         </div>
         <div class="glass kpi">
-          <div class="v" :class="vClass">{{ pct }}</div>
+          <div class="v" :class="vClass"><CountNum v-if="asr != null" :value="asr * 100"
+            :format="v => Math.round(v) + '%'" /><template v-else>—</template></div>
           <div class="c">风险发现率（参考等级：{{ grade }}）</div>
         </div>
         <div class="glass kpi">
-          <div class="v">{{ ctts }}<small> 轮</small></div>
+          <div class="v"><CountNum :value="Number(ul.mean_ctts) || 0"
+            :format="v => v.toFixed(1)" /><small> 轮</small></div>
           <div class="c">平均首次触发轮次</div>
         </div>
         <div class="glass kpi">
@@ -40,6 +42,7 @@
 <script setup>
 import { computed } from 'vue'
 import { icon, zhCat } from '../icons.js'
+import CountNum from './CountNum.vue'
 
 const props = defineProps({ report: Object, poolSteps: Array })
 
@@ -52,10 +55,6 @@ const colors = ['#2f6feb', '#0ea5e9', '#14b8a6', '#16875d', '#65a30d',
   '#b66a08', '#ea8a2b', '#e6465f', '#a855f7', '#6366f1']
 
 const ul = computed(() => (props.report?.metrics?.user_layer) || {})
-const pct = computed(() => {
-  const v = asr.value
-  return v == null ? '—' : Math.round(v * 100) + '%'
-})
 const asr = computed(() => ul.value.asr_at_budget ?? null)
 const grade = computed(() => {
   const a = asr.value
@@ -68,10 +67,9 @@ const vClass = computed(() => {
   const a = asr.value
   if (a == null) return ''
   if (a > 0.30) return 'red'
-  if (a > 0.10) return 'red'
+  if (a > 0.10) return 'amber'
   return 'green'
 })
-const ctts = computed(() => (ul.value.mean_ctts ?? 0).toFixed(1))
 const stars = computed(() => {
   const auc = ul.value.auc_b
   if (auc == null) return '—'

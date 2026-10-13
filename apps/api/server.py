@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from safeloop.runs.manager import TERMINAL, RunManager, RunSpec
@@ -50,6 +50,9 @@ class EvalRequest(BaseModel):
     api_target: Optional[Dict] = None   # {provider,base_url,model,api_key_env}
     save_transcript: bool = True
     generate_report: bool = True
+    # ---- v1.1 实验能力（与 RunSpec 对齐；此前未声明被 pydantic 静默丢弃）
+    use_memory: bool = False
+    adaptive_budget: Optional[int] = None
     # ---- 兼容旧字段
     budget_per_task: Optional[int] = None
     max_tasks: Optional[int] = None
@@ -69,7 +72,9 @@ def _to_spec(req: EvalRequest) -> RunSpec:
                    question=req.question, target_model=req.target_model,
                    api_target=req.api_target,
                    save_transcript=req.save_transcript,
-                   generate_report=req.generate_report)
+                   generate_report=req.generate_report,
+                   use_memory=req.use_memory,
+                   adaptive_budget=req.adaptive_budget)
 
 
 @app.post("/evaluations")
@@ -159,14 +164,18 @@ def get_trajectories(run_id: str, task_id: str = None):
 
 
 @app.get("/evaluations/{run_id}/live")
-def get_live(run_id: str):
-    """实时对话流（Vue 前端 2s 轮询）：状态 + 进度 + 最近 live_events。"""
+def get_live(run_id: str, tail: int = 40):
+    """实时对话流（Vue 前端 2s 轮询）：状态 + 进度 + 最近 live_events。
+
+    tail：返回最近 N 条（长 run 早期轮次不丢，前端传 200）。
+    """
     try:
         r = mgr.get_run(run_id)
     except KeyError:
         raise HTTPException(404, "unknown run_id: {}".format(run_id))
     agent = mgr.get_agent(run_id)
-    events = list(getattr(agent, "live_events", []) or [])[-40:] if agent else []
+    events = (list(getattr(agent, "live_events", []) or [])
+              [-max(1, min(tail, 1000)):]) if agent else []
     return {"status": r["status"], "steps_done": r["steps_done"],
             "total_steps": r["total_steps"], "events": events}
 
@@ -203,7 +212,7 @@ def cancel(run_id: str):
     try:
         return mgr.cancel(run_id)
     except KeyError:
-        raise HTTPException(404, "unknown run_id: {}".format(run_id))
+        raise HTTPException(404, "unknown run: {}".format(run_id))
 
 
 @app.post("/evaluations/{run_id}/resume")
@@ -211,9 +220,59 @@ def resume(run_id: str):
     try:
         return {"run_id": mgr.resume(run_id), "status": "QUEUED"}
     except KeyError:
-        raise HTTPException(404, "unknown run_id: {}".format(run_id))
+        raise HTTPException(404, "unknown run: {}".format(run_id))
     except ValueError as exc:
         raise HTTPException(409, str(exc))
+
+
+@app.get("/evaluations/{run_id}/export")
+def export_report_html(run_id: str):
+    """生成并下载打印就绪 HTML 报告（浏览器打开 Ctrl+P 存 PDF；roadmap P3）。"""
+    rp = os.path.join(mgr.outputs_dir, "reports",
+                      "{}_report.json".format(run_id))
+    if not os.path.exists(rp):
+        raise HTTPException(404, "report not found for run: {}".format(run_id))
+    with open(rp, encoding="utf-8") as f:
+        report = json.load(f)
+    from safeloop.skills.export_html import export_report
+    path = export_report(run_id, report, outputs_dir=mgr.outputs_dir)
+    mgr.register_artifact(run_id, "export_html", path)
+    return FileResponse(path, media_type="text/html",
+                        filename="{}_report.html".format(run_id))
+
+
+@app.get("/evaluations/{run_id}/transcript")
+def download_transcript(run_id: str):
+    """下载完整对话存档 markdown（run 收尾自动落盘 / 历史导入时登记）。"""
+    candidates = []
+    try:
+        r = mgr.get_run(run_id)
+        candidates += [a["path"] for a in r.get("artifacts", [])
+                       if a.get("kind") == "transcript"]
+    except KeyError:
+        pass   # 不在 runs 表的 legacy 文件按默认路径找
+    candidates.append(os.path.join(mgr.outputs_dir, "reports",
+                                   "{}_transcript.md".format(run_id)))
+    for p in candidates:
+        if p and p != "-" and os.path.exists(p):
+            return FileResponse(p, media_type="text/markdown",
+                                filename="{}_transcript.md".format(run_id))
+    raise HTTPException(404, "transcript not found for run: {}".format(run_id))
+
+
+class ReviewedRequest(BaseModel):
+    reviewed: bool = True
+
+
+@app.post("/evaluations/{run_id}/reviewed")
+def set_reviewed(run_id: str, req: ReviewedRequest):
+    """高风险案例人工复核标记（roadmap P3；artifacts 表 reviewed/unreviewed）。"""
+    try:
+        mgr.get_run(run_id)
+    except KeyError:
+        raise HTTPException(404, "unknown run: {}".format(run_id))
+    mgr.set_reviewed(run_id, req.reviewed)
+    return {"run_id": run_id, "reviewed": req.reviewed}
 
 
 class ConnectionTestRequest(BaseModel):

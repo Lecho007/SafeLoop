@@ -3,10 +3,33 @@
     <div class="sl-sec" v-html="secIcon + '　评估报告'"></div>
     <div v-if="!report" class="glass sl-empty" v-html="emptyHtml"></div>
     <template v-else>
-      <div style="margin-bottom:12px">
-        <span :class="'dot ' + dotCls"></span>
-        <b style="font-size:22px">{{ grade }}</b>
-        <span class="sl-meta">　风险发现率 {{ pct }}（参考等级，分级规则：≤10% 低，≤30% 中，&gt;30% 高）</span>
+      <!-- 等级徽章卡 + 操作区 -->
+      <div class="glass grade-card" :class="dotCls">
+        <div class="gc-main">
+          <span class="gc-dot"></span>
+          <div class="gc-txt">
+            <div class="gc-grade">{{ grade }}</div>
+            <div class="sl-meta">风险发现率 {{ pct }}（参考等级，分级规则：≤10% 低，≤30% 中，&gt;30% 高）</div>
+          </div>
+          <span class="gc-sp"></span>
+          <div class="gc-ops">
+            <el-tooltip :disabled="canManage" content="演示/外部数据不在运行库，不支持导出"
+              placement="top">
+              <span>
+                <el-button size="small" :loading="exporting" :disabled="!canManage"
+                  @click="doExport">
+                  <span v-html="dlIcon"></span>&nbsp;导出 HTML 报告</el-button>
+              </span>
+            </el-tooltip>
+            <el-tooltip :disabled="canManage" content="演示/外部数据无对话存档"
+              placement="top">
+              <span>
+                <el-button size="small" :disabled="!canManage" @click="doTranscript">
+                  <span v-html="docIcon"></span>&nbsp;下载对话存档</el-button>
+              </span>
+            </el-tooltip>
+          </div>
+        </div>
       </div>
       <div class="card" style="padding:20px 24px">
         <div style="font-size:17px;font-weight:700;margin-bottom:6px">总体结论</div>
@@ -15,6 +38,11 @@
           对比检测：{{ verdict }}。<span class="sl-meta">这也是我们的研究发现：
           安全判别信号「可观察」不等于「应该干预」。</span>
         </div>
+      </div>
+      <div v-if="grade === '高风险' && canManage" class="card" style="padding:14px 24px;margin-top:12px">
+        <el-checkbox v-model="reviewed" @change="toggleReviewed">
+          本报告的高风险案例已完成人工复核</el-checkbox>
+        <span class="sl-meta">复核状态随 run 存档，供交付与审计追溯</span>
       </div>
       <el-collapse style="margin-top:12px">
         <el-collapse-item title="本次体检的适用范围">
@@ -33,12 +61,16 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { icon, zhCat } from '../icons.js'
+import { api } from '../api.js'
 import { useStore } from '../store.js'
 
 const store = useStore()
 const secIcon = icon('doc', 16)
+const dlIcon = icon('download', 13)
+const docIcon = icon('doc', 13)
 const emptyHtml = icon('doc', 30, 'stroke:#9db0c9') +
   `<div class='t'>暂无评估数据</div><div class='h'>完成一次检测后，这里给出总体结论、` +
   `适用范围与研究指标（专家模式）。</div>`
@@ -96,10 +128,41 @@ const verdict = computed(() => {
 })
 const limitations = computed(() => (report.value?.limitations || []).slice(0, 3))
 const research = computed(() => report.value?.metrics?.research_layer || {})
-</script>
 
-<style scoped>
-.dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; }
-.dot.green { background: var(--safe); } .dot.amber { background: var(--warn); }
-.dot.red { background: var(--risk); } .dot.gray { background: var(--blue); }
-</style>
+// ---- 操作区：导出 / 下载 / 人工复核（演示等不在运行库的数据自动禁用）
+const exporting = ref(false)
+const reviewed = ref(false)
+const canManage = ref(true)
+
+watch(() => store.viewedRunId, async (id) => {
+  reviewed.value = false
+  canManage.value = true
+  if (!id) return
+  try {
+    const row = await api.getRun(id)
+    reviewed.value = (row.artifacts || []).some(a => a.kind === 'reviewed')
+  } catch (e) { canManage.value = false }
+}, { immediate: true })
+
+async function doExport() {
+  exporting.value = true
+  try {
+    await api.exportHtml(store.viewedRunId)
+    ElMessage.success('已导出 HTML 报告（浏览器打开后 Ctrl+P 可存 PDF）')
+  } catch (e) { ElMessage.error('导出失败：' + e) }
+  exporting.value = false
+}
+async function doTranscript() {
+  try { await api.transcript(store.viewedRunId) }
+  catch (e) { ElMessage.error('暂无对话存档（该 run 可能未保存 transcript）') }
+}
+async function toggleReviewed(v) {
+  try {
+    await api.setReviewed(store.viewedRunId, v)
+    ElMessage.success(v ? '已标记人工复核' : '已取消复核标记')
+  } catch (e) {
+    reviewed.value = !v
+    ElMessage.error('标记失败：' + e)
+  }
+}
+</script>

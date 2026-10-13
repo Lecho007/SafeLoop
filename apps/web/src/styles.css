@@ -40,8 +40,9 @@ body::after {
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
   box-shadow: 0 1px 2px rgba(24, 34, 53, .05); }
 
-/* ---------- 页头 ---------- */
-.hd { display: flex; align-items: center; gap: 14px; padding: 14px 22px; margin-bottom: 18px; }
+/* ---------- 页头（sticky 玻璃） ---------- */
+.hd { display: flex; align-items: center; gap: 14px; padding: 14px 22px; margin-bottom: 18px;
+  position: sticky; top: 10px; z-index: 40; }
 .hd .logo { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
   background: linear-gradient(135deg, #2f6feb, #7556d8); color: #fff; flex: none;
   box-shadow: 0 6px 18px rgba(47, 111, 235, .35); }
@@ -63,6 +64,10 @@ body::after {
 .sl-sec .ic { color: var(--blue); }
 .badge-lab { font-size: 11px; color: #7556d8; border: 1px solid #d6caf5; border-radius: 99px;
   padding: 1px 8px; margin-left: 6px; font-style: normal; }
+.sl-pill { display: inline-block; padding: 2px 11px; border-radius: 999px; font-size: 12px;
+  color: var(--blue); background: rgba(47, 111, 235, .08); border: 1px solid rgba(47, 111, 235, .28); }
+.sl-pill.on { background: var(--blue); color: #fff; border-color: transparent;
+  box-shadow: 0 4px 12px rgba(47, 111, 235, .28); }
 
 /* ---------- 表单卡 ---------- */
 .form-card { padding: 18px 22px; }
@@ -112,14 +117,37 @@ body::after {
 .term-badge { font-size: 11px; color: #8fd8cc; border: 1px solid rgba(94, 234, 212, .3);
   border-radius: 99px; padding: 2px 10px;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+/* 终端头信号点图例 */
+.term-legend { margin-left: auto; display: flex; gap: 12px; color: #6b7f9e; font-size: 11px;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif; letter-spacing: 0; }
+.term-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
+.term-legend .lg i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.term-legend .lg i.r { background: #ff6b81; }
+.term-legend .lg i.a { background: #f5b942; }
+.term-legend .lg i.g { background: #34d899; }
+.term-head .right.squeezed { margin-left: 12px; }
+/* 截断行「全文」入口 */
+.tx-link { color: var(--cyan); font-size: 12px; margin-left: 8px; cursor: pointer;
+  text-decoration: underline dotted; white-space: nowrap; }
+.tx-link:hover { color: #a7f3e3; text-decoration: underline; }
+/* 空态打字光标 */
+.cursor { display: inline-block; width: 8px; height: 14px; background: var(--cyan);
+  margin-left: 6px; vertical-align: -2px; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+/* 新轮次淡入 */
+.t-round, .t-q, .t-a { animation: fadeIn .18s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } }
 
 /* ---------- KPI / 分布 ---------- */
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 4px 0 10px; }
-.kpi { padding: 16px 20px; }
+.kpi { padding: 16px 20px; transition: transform .2s ease, box-shadow .2s ease; }
+.kpi:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(23, 32, 51, .13); }
 .kpi .v { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.15;
   background: linear-gradient(135deg, #2f6feb, #7556d8);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
 .kpi .v.red { background: linear-gradient(135deg, #e6465f, #f97362);
+  -webkit-background-clip: text; background-clip: text; }
+.kpi .v.amber { background: linear-gradient(135deg, #b66a08, #eab308);
   -webkit-background-clip: text; background-clip: text; }
 .kpi .v.green { background: linear-gradient(135deg, #16875d, #34d899);
   -webkit-background-clip: text; background-clip: text; }
@@ -134,7 +162,9 @@ body::after {
 /* ---------- 历史 ---------- */
 .hist { padding: 6px 22px; }
 .hrow { display: flex; align-items: center; gap: 14px; padding: 10px 4px;
-  border-bottom: 1px dashed rgba(223, 229, 238, .9); font-size: 13.5px; }
+  border-bottom: 1px dashed rgba(223, 229, 238, .9); font-size: 13.5px;
+  border-radius: 8px; transition: background .15s ease; }
+.hrow:hover { background: rgba(47, 111, 235, .05); }
 .hrow:last-child { border-bottom: none; }
 .hrow .rid { font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12.5px; color: var(--muted); }
@@ -147,6 +177,26 @@ body::after {
 
 /* ---------- 报告卡 ---------- */
 .sl-answer { font-size: 15.5px; line-height: 1.8; color: var(--txt); }
+
+/* ---------- 报告等级徽章卡 ---------- */
+.grade-card { --gc: var(--blue); padding: 18px 24px; margin-bottom: 12px;
+  position: relative; overflow: hidden; }
+.grade-card.green { --gc: var(--safe); }
+.grade-card.amber { --gc: var(--warn); }
+.grade-card.red { --gc: var(--risk); }
+.grade-card::before { content: ""; position: absolute; top: -90px; right: -60px;
+  width: 320px; height: 320px; border-radius: 50%; background: var(--gc);
+  filter: blur(75px); opacity: .22; pointer-events: none; }
+.gc-main { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; position: relative; }
+.gc-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--gc);
+  box-shadow: 0 0 16px var(--gc); flex: none; }
+.gc-grade { font-size: 26px; font-weight: 700; color: var(--gc); line-height: 1.2; }
+.gc-sp { flex: 1; }
+.gc-ops { display: flex; gap: 10px; }
+.gc-ops .el-button.is-disabled { opacity: .5; }
+
+/* ---------- 可访问性 ---------- */
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
 
 /* ---------- Element Plus 融合微调 ---------- */
 .el-segmented { --el-border-radius-base: 999px; background: rgba(255,255,255,.55); }
@@ -161,6 +211,6 @@ body::after {
 .el-collapse-item__header { background: transparent; font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
-  .term-head .dot, .bar { animation: none !important; }
+  .term-head .dot, .bar, .cursor, .t-round, .t-q, .t-a { animation: none !important; }
   * { transition: none !important; }
 }

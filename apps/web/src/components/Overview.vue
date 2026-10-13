@@ -21,8 +21,6 @@
         <div class="sl-hint" v-else>填三项接入任意模型 · 密钥只经环境变量，不存盘</div>
 
         <template v-if="wizard.target === '本地模型'">
-          <div class="sl-pill on" style="display:inline-block;margin:4px 0 10px">
-            已内置 Phi-3.5-mini · 无需配置</div>
           <div class="sl-meta" style="line-height:2.15">
             <div v-html="ic('cpu', 13, 'stroke:#2f6feb') + ' 被测模型　Phi-3.5-mini（NF4 量化）'"></div>
             <div v-html="ic('play', 11, 'stroke:#7556d8') + ' 红方测试员　Qwen3-1.7B'"></div>
@@ -95,8 +93,9 @@
 
         <div class="lbl">每个场景测试轮数</div>
         <el-slider v-model="wizard.rounds" :min="1" :max="10" show-input
-          :show-input-controls="false" input-size="small"
-          tip="调用次数 = 场景数 × 轮数（对比模式翻倍）；红方与裁判为本地推理，不计 API 费用" />
+          :show-input-controls="false" input-size="small" />
+        <div class="sl-hint" style="margin:2px 0 0">
+          调用次数 = 场景数 × 轮数（对比模式翻倍）；红方与裁判为本地推理，不计 API 费用</div>
 
         <el-collapse class="adv">
           <el-collapse-item title="高级选项">
@@ -116,11 +115,21 @@
 
     <!-- 行动条 -->
     <div class="glass action">
-      <el-button type="primary" size="large" @click="start" :loading="false">
+      <el-button type="primary" size="large" @click="start"
+        :loading="submitting" :disabled="store.running">
         <span v-html="ic('play', 13, 'stroke:#fff')"></span>&nbsp;开始安全体检</el-button>
       <el-button size="large" @click="loadDemo">载入示例数据</el-button>
       <span class="est">运行期间可自由浏览本页各区块 · 离开再回来进度不丢</span>
     </div>
+
+    <!-- 轮询失联 / 失败原因 -->
+    <el-alert v-if="store.pollError" type="error" :closable="false"
+      title="服务暂时不可达：正在自动重试轮询（请确认 uvicorn 服务仍在运行）"
+      style="margin:14px 0 0" />
+    <el-alert v-else-if="store.lastRun && store.lastRun.status === 'FAILED'" type="error"
+      closable @close="store.lastRun = null"
+      :title="'检测失败：' + (store.lastRun.error || '未知原因') + '（可在运行历史中续跑）'"
+      style="margin:14px 0 0" />
 
     <!-- 实况（真实运行） / 实况预演（演示） -->
     <template v-if="store.running">
@@ -134,21 +143,25 @@
           size="small" type="warning" plain @click="stop">停止</el-button>
       </div>
       <RunTerminal :right="'…' + String(store.activeRunId || '').slice(-6)"
-        :right-title="store.activeRunId">
+        :right-title="store.activeRunId" legend>
         <template #head>
           <span class="dot"></span>{{ store.run?.status || '…' }} · {{ runStateZh }}
           <span>对话 <span class="val">{{ store.run?.steps_done ?? 0 }}</span>/
             <span class="val">{{ store.run?.total_steps || '?' }}</span></span>
         </template>
         <div v-if="!liveEvents.length" style="color:#5f7495;font-family:ui-monospace,Consolas,monospace;font-size:13px">
-          $ 等待首轮对话…（排队 / 模型加载中，完成后逐轮显示在此）</div>
+          $ 等待首轮对话…（排队 / 模型加载中，完成后逐轮显示在此）<span class="cursor"></span></div>
         <template v-for="(e, i) in liveEvents" :key="i">
           <div class="t-round">
             <span class="sg" :class="sgOf(e)"></span>{{ e.branch ? '［' + e.branch + '］' : '' }}R{{ e.round }}
             · {{ e.task_id }} · {{ stratZh(e.strategy) }} · {{ judgeTxt(e) }}
           </div>
-          <div class="t-q"><div class="t-role">TESTER ▸</div>{{ clip(e.prompt, 240) }}</div>
-          <div class="t-a"><div class="t-role">TARGET ▸</div>{{ clip(e.response, 340) || '（空回答）' }}</div>
+          <div class="t-q"><div class="t-role">TESTER ▸</div>{{ clip(e.prompt, 240) }}<a
+            v-if="len(e.prompt) > 240" class="tx-link"
+            @click="full(e.prompt, 'TESTER 提问全文 · ' + e.task_id + ' R' + e.round)">全文</a></div>
+          <div class="t-a"><div class="t-role">TARGET ▸</div>{{ clip(e.response, 340) || '（空回答）' }}<a
+            v-if="len(e.response) > 340" class="tx-link"
+            @click="full(e.response, 'TARGET 回答全文 · ' + e.task_id + ' R' + e.round)">全文</a></div>
         </template>
       </RunTerminal>
       <div class="sl-sec" v-html="treeIcon + '　决策路径'"></div>
@@ -159,7 +172,7 @@
       <div class="sl-sec" v-html="termIcon + '　实况预演 ' +
         `<span class='term-badge'>DEMO · 演示数据</span>`"></div>
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
-        <el-button size="small" @click="autoplay">自动播放</el-button>
+        <el-button size="small" @click="autoplay">{{ autoPlaying ? '播放中…' : '自动播放' }}</el-button>
         <el-slider v-model="demoStep" :min="1" :max="demo.steps.length" style="flex:1" />
         <span class="sl-meta">{{ demoStep }}/{{ demo.steps.length }} 轮</span>
       </div>
@@ -198,13 +211,13 @@
 
     <!-- 风险发现 + 历史 -->
     <RiskFindings :report="viewedReport" :pool-steps="viewedTrajs" />
-    <HistoryList ref="hist" :version="historyVersion" :viewed-run-id="store.viewedRunId"
-      @changed="() => {}" />
+    <HistoryList ref="hist" :version="historyVersion" :viewed-run-id="store.viewedRunId" />
+    <TextDialog ref="txDlg" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import hero from '../assets/hero.html?raw'
 import { api } from '../api.js'
@@ -216,6 +229,7 @@ import RunTerminal from './RunTerminal.vue'
 import DecisionTree from './DecisionTree.vue'
 import RiskFindings from './RiskFindings.vue'
 import HistoryList from './HistoryList.vue'
+import TextDialog from './TextDialog.vue'
 
 const store = useStore()
 const ic = icon
@@ -225,11 +239,11 @@ const termIcon = icon('terminal', 15)
 const treeIcon = icon('tree', 15)
 
 const archOpen = ref(['arch'])
-const hero0 = hero
 const demo = DEMO
 const demoRounds = DEMO_ROUNDS
 const demoStep = ref(demo.steps.length)
 const hist = ref(null)
+const txDlg = ref(null)
 
 const wizard = reactive({
   target: '本地模型', provider: 'openai_chat', baseUrl: '', model: '', keyEnv: 'TARGET_API_KEY',
@@ -239,6 +253,7 @@ const wizard = reactive({
 })
 const conn = ref(null)
 const connLoading = ref(false)
+const submitting = ref(false)
 const suiteRows = ref([])
 const historyVersion = ref(0)
 
@@ -297,6 +312,10 @@ const estRange = computed(() => {
 })
 
 // ---- 连接测试 / 提交
+// 改动接入配置后旧测试结果失效，避免带旧地址提交
+watch(() => [wizard.provider, wizard.baseUrl, wizard.model, wizard.keyEnv],
+  () => { conn.value = null })
+
 async function testConn() {
   connLoading.value = true
   try {
@@ -309,6 +328,10 @@ async function testConn() {
 }
 
 async function start() {
+  if (store.running) {
+    ElMessage.warning('已有检测在进行，请等待完成或先停止')
+    return
+  }
   let apiTarget = null
   if (wizard.target !== '本地模型') {
     if (!conn.value?.ok) {
@@ -334,14 +357,18 @@ async function start() {
     spec.use_memory = wizard.useMemory
     spec.adaptive_budget = wizard.adaptiveQ || null
   }
+  submitting.value = true
   try {
     const id = await store.submitRun(spec)
     ElMessage.success('已加入队列：' + id + ' —— 运行期间可继续浏览')
   } catch (e) { ElMessage.error('提交失败：' + e) }
+  submitting.value = false
 }
 async function stop() {
-  await store.cancelActive()
-  ElMessage({ message: '已请求取消：当前调用结束或超时后生效，已完成结果保留', type: 'warning' })
+  try {
+    await store.cancelActive()
+    ElMessage({ message: '已请求取消：当前调用结束或超时后生效，已完成结果保留', type: 'warning' })
+  } catch (e) { ElMessage.error('取消请求失败：' + e) }
   historyVersion.value++
 }
 async function loadDemo() {
@@ -351,10 +378,22 @@ async function loadDemo() {
     ElMessage.success('已载入示例报告（演示数据，非本次检测）')
   } catch (e) { ElMessage.error('载入失败：' + e) }
 }
-function autoplay() { demoStep.value = 1; const t = setInterval(() => {
-  if (demoStep.value >= demo.steps.length) clearInterval(t)
-  else demoStep.value++
-}, 900) }
+
+// ---- 演示自动播放（防重入：播放中不叠加定时器）
+let demoTimer = null
+const autoPlaying = ref(false)
+function autoplay() {
+  if (demoTimer) return
+  demoStep.value = 1
+  autoPlaying.value = true
+  demoTimer = setInterval(() => {
+    if (demoStep.value >= demo.steps.length) {
+      clearInterval(demoTimer)
+      demoTimer = null
+      autoPlaying.value = false
+    } else demoStep.value++
+  }, 900)
+}
 
 // ---- 实况
 const liveEvents = computed(() => store.live?.events || [])
@@ -366,8 +405,19 @@ const runStateZh = computed(() => ({
   CANCELLING: '正在停止（当前调用结束后生效）', EVALUATING: '独立评审',
   ANALYZING: '分析', REPORTING: '生成报告',
 }[store.run?.status] || store.run?.status || ''))
+// 每秒 tick 驱动「已用时间」（此前 computed 依赖 Date.now() 会冻结）
+const nowTick = ref(Date.now())
+let tickTimer = null
+onMounted(() => {
+  tickTimer = setInterval(() => { nowTick.value = Date.now() }, 1000)
+  if (store.activeRunId && !store.timer) store.startPolling()
+})
+onUnmounted(() => {
+  clearInterval(tickTimer)
+  if (demoTimer) clearInterval(demoTimer)
+})
 const elapsed = computed(() => {
-  const sec = Math.max(0, (Date.now() - (store.runT0 || Date.now())) / 1000)
+  const sec = Math.max(0, (nowTick.value - (store.runT0 || nowTick.value)) / 1000)
   return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(Math.floor(sec % 60)).padStart(2, '0')
 })
 const sgOf = (e) => e.success ? 'r' : (e.advancement === 'PARTIAL' || e.safety === 'Unsafe' ? 'a' : 'g')
@@ -375,7 +425,9 @@ const judgeTxt = (e) => e.advancement ? `目标推进 ${e.advancement}`
   : e.safety ? `内容判定 ${e.safety}` : '已记录'
 const stratZh = (s) => ({ direct: '直接提问', roleplay: '角色扮演', reframing: '换角度提问',
   obfuscation: '混淆表述', multi_turn: '分步引导' }[s] || s || '?')
+const len = (t) => String(t ?? '').length
 const clip = (t, n) => { t = String(t ?? ''); return t.length <= n ? t : t.slice(0, n) + '…' }
+const full = (t, title) => txDlg.value?.open(t, title)
 const demoVerdict = computed(() =>
   demo.steps.some(s => s.ok) ? '风险确认' : '抵御成功')
 
@@ -383,7 +435,6 @@ const demoVerdict = computed(() =>
 watch(() => store.historyVersion, () => { historyVersion.value++; hist.value?.refresh?.() })
 const viewedReport = computed(() => store.viewedReport)
 const viewedTrajs = computed(() => store.viewedTrajs || [])
-onMounted(() => { if (store.activeRunId) store.startPolling() })
 </script>
 
 <style scoped>
