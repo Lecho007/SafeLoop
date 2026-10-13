@@ -1,0 +1,18 @@
+# SafeLoop 工作台（轻量服务版）
+#   docker compose up -d          → http://127.0.0.1:8712
+#   可选：export SAFELOOP_API_KEY=... 后重建，启用访问鉴权
+# outputs 用 named volume 持久化（首次启动自动继承镜像内的演示回放数据）
+services:
+  safeloop:
+    build: .
+    image: safeloop-workbench:latest
+    ports:
+      - "8712:8712"
+    environment:
+      SAFELOOP_API_KEY: ${SAFELOOP_API_KEY:-}
+    volumes:
+      - safeloop_outputs:/app/outputs
+    restart: unless-stopped
+
+volumes:
+  safeloop_outputs:

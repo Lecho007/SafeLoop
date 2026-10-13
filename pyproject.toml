@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safeloop-workbench"
+version = "1.1.0"
+description = "SafeLoop：单机大模型安全评估工作台（闭环红队 + 独立评审）"
+readme = "setup_env.md"
+requires-python = ">=3.8"
+dependencies = [
+    "pyyaml>=5.4",
+    "rich>=13",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+]
+
+[project.scripts]
+safeloop = "apps.cli.safeloop_cli:main"
+
+[tool.setuptools]
+packages = [
+    "apps", "apps.api", "apps.cli",
+    "safeloop", "safeloop.agents", "safeloop.engine", "safeloop.runs",
+    "safeloop.skills", "safeloop.skills.memory",
+    "core", "engine", "agents", "targets", "evaluation",
+    "memory", "scheduler", "feedback", "experiments", "utils",
+]

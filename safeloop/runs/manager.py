@@ -25,6 +25,15 @@ logger = logging.getLogger("safeloop.runs")
 
 TERMINAL = ("COMPLETED", "FAILED", "CANCELLED")
 
+# agent 状态机 → runs.status 域的映射（历史 bug：READY/PLANNING/REPORTING 等
+# 中间态曾被直接写入 runs.status，竞态窗口内 API/前端会读到非法状态值）
+_AGENT_TO_RUN_STATUS = {
+    "IDLE": "RUNNING", "PLANNING": "RUNNING", "READY": "RUNNING",
+    "RUNNING": "RUNNING", "CANCELLING": "CANCELLING",
+    "EVALUATING": "RUNNING", "ANALYZING": "RUNNING", "REPORTING": "RUNNING",
+    "COMPLETED": "COMPLETED", "FAILED": "FAILED", "CANCELLED": "CANCELLED",
+}
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs(
   run_id TEXT PRIMARY KEY,
@@ -251,6 +260,31 @@ class RunManager:
                 (run_id, "reviewed" if reviewed else "unreviewed", "-"))
             self._db.commit()
 
+    def prune_runs(self, days: int = 30) -> Dict:
+        """清理 N 天前的排队/取消/失败 run 记录（长跑库维护）。
+
+        只删 runs/run_tasks/run_events/artifacts/checkpoints 行；COMPLETED
+        与 imported 记录、以及文件系统上的产物（报告/轨迹/transcript）全部保留。
+        """
+        cutoff = time.strftime("%Y-%m-%d %H:%M:%S",
+                               time.localtime(time.time() - max(0, days) * 86400))
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT run_id FROM runs WHERE status IN ('QUEUED','CANCELLED','FAILED')"
+                " AND created_at < ? AND imported = 0", (cutoff,)).fetchall()
+            ids = [r["run_id"] for r in rows]
+            if ids:
+                marks = ",".join("?" * len(ids))
+                for table in ("run_tasks", "run_events", "artifacts", "checkpoints"):
+                    self._db.execute(
+                        "DELETE FROM {} WHERE run_id IN ({})".format(table, marks), ids)
+                self._db.execute(
+                    "DELETE FROM runs WHERE run_id IN ({})".format(marks), ids)
+                self._db.commit()
+        if ids:
+            logger.info("pruned %d stale runs (>%dd)", len(ids), days)
+        return {"pruned": len(ids), "days": days, "run_ids": ids[:10]}
+
     def register_artifact(self, run_id: str, kind: str, path: str) -> None:
         """登记产物（导出文件等；P3）。"""
         with self._lock:
@@ -370,9 +404,8 @@ class RunManager:
             if len(events) >= last:
                 self._mirror_seq[run_id] = len(events)
             steps = len(getattr(agent, "live_events", []) or [])
-            status = getattr(agent, "state", "RUNNING")
-            if status == "IDLE":
-                status = "RUNNING"
+            status = _AGENT_TO_RUN_STATUS.get(
+                getattr(agent, "state", "RUNNING"), "RUNNING")
             self._db.execute(
                 "UPDATE runs SET steps_done=?,status=?,updated_at=?"
                 " WHERE run_id=? AND status NOT IN ('CANCELLED','FAILED')",

@@ -46,8 +46,23 @@ def main():
     tc.add_argument("--base-url", required=True)
     tc.add_argument("--model", required=True)
     tc.add_argument("--provider", default="openai_chat",
-                    choices=["openai_chat", "anthropic", "openai_responses"])
+                   choices=["openai_chat", "anthropic", "openai_responses"])
     tc.add_argument("--api-key-env", default="TARGET_API_KEY")
+
+    s = sub.add_parser("serve", help="启动 Web 工作台（SPA + API 单进程单端口）")
+    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--port", type=int, default=8712)
+
+    wb = sub.add_parser("workbench", help="终端向导工作台（rich 交互），其余参数透传")
+    wb.add_argument("rest", nargs=argparse.REMAINDER)
+
+    cl = sub.add_parser("cleanup",
+                        help="清理 N 天前的排队/取消/失败 run 记录（保留完成 run 与产物文件）")
+    cl.add_argument("--days", type=int, default=30)
+
+    rv = sub.add_parser("review", help="标记（--off 取消）高风险案例人工复核")
+    rv.add_argument("run_id")
+    rv.add_argument("--off", action="store_true")
 
     args = ap.parse_args()
     from utils.logging import setup_logging
@@ -102,6 +117,22 @@ def main():
         print("\n代表案例:")
         for c in r["representative_cases"]:
             print(" -", c["task_id"], c["why_representative"])
+    elif args.cmd == "serve":
+        import uvicorn
+        uvicorn.run("apps.api.server:app", host=args.host, port=args.port)
+    elif args.cmd == "workbench":
+        from apps.cli.workbench_cli import main as wb_main
+        sys.exit(wb_main(list(args.rest)))
+    elif args.cmd == "cleanup":
+        from safeloop.runs.manager import RunManager
+        mgr = RunManager(start_worker=False)
+        print(json.dumps(mgr.prune_runs(args.days), ensure_ascii=False, indent=2))
+    elif args.cmd == "review":
+        from safeloop.runs.manager import RunManager
+        mgr = RunManager(start_worker=False)
+        mgr.set_reviewed(args.run_id, not args.off)
+        print(json.dumps({"run_id": args.run_id, "reviewed": not args.off},
+                         ensure_ascii=False))
 
 
 if __name__ == "__main__":
