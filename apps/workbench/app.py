@@ -83,6 +83,10 @@ html,body,.stApp{background:var(--bg)!important;color:var(--txt)!important;}
 .stApp::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
   opacity:.5;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .03 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
 .stApp>div{position:relative;z-index:1;}
+/* 主容器限宽居中（对齐预览稿阅读宽度，宽屏不再拉伸） */
+.stApp .block-container, [data-testid="stMainBlockContainer"],
+div[data-testid="block-container"]{max-width:1100px!important;
+  margin:0 auto!important;padding:1.2rem 2rem 3rem!important;}
 h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
 .sl-sub{color:var(--muted);font-size:14px;margin:2px 0 0;}
 .sl-meta{color:var(--muted);font-size:13px;}
@@ -295,8 +299,7 @@ tab0, tabH, tab2, tab4, tab5 = st.tabs([
 
 # ============================================================ Tab 0 总览
 with tab0:
-    with st.expander("{}　系统架构与任务路由".format(icon("tree", 16)),
-                     expanded=False):
+    with st.expander("系统架构与任务路由", expanded=False):
         st.caption("任务按风险语义分流到专业裁判；默认只观察不干预，"
                    "引导反馈为实验能力；独立评审官永远在闭环之外。")
         _h, _r = st.columns([1.05, 1])
@@ -310,13 +313,16 @@ with tab0:
         with st.container(border=True):
             st.markdown("**{}　检测对象**".format(icon("cpu", 16)), unsafe_allow_html=True)
             target_kind = st.radio(
-                "检测对象", ["本地模型（已内置）", "在线 API 模型（黑盒）"],
-                label_visibility="collapsed")
+                "检测对象", ["本地模型", "在线 API 模型"],
+                label_visibility="collapsed",
+                help="本地 = 已内置 Phi-3.5-mini，无需配置；"
+                     "在线 = 接入任意 OpenAI / Anthropic 兼容接口")
             if "本地" in target_kind:
-                st.markdown('<span class="sl-pill on">已内置 Phi-3.5-mini</span>',
-                            unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="sl-pill on">已内置 Phi-3.5-mini · 无需配置</span>',
+                    unsafe_allow_html=True)
             else:
-                st.caption("填三项接入任意模型：接口地址、模型名、密钥（只经环境变量，不存盘）。")
+                st.caption("填三项接入任意模型 · 密钥只经环境变量，不存盘")
                 c1, c2 = st.columns(2)
                 with c1:
                     api_provider = st.selectbox("接口协议", [
@@ -352,24 +358,43 @@ with tab0:
         with st.container(border=True):
             st.markdown("**{}　检测方式与范围**".format(icon("target", 16)),
                         unsafe_allow_html=True)
-            mode = st.radio("检测方式", [
-                "标准检测（推荐）—— 测试员自主多轮测试，全程记录证据",
-                "智能引导检测（实验性）—— 安全判别结果参与引导策略",
-                "对比检测 —— 两种都跑，告诉你引导有没有用"], index=0,
-                label_visibility="collapsed")
-            suite_opt = st.radio("任务集", [
-                "国际基准（JBB-100，英文）",
-                "中文检测（SafeLoop-CN，JailBench 全量 {} 场景）".format(
-                    len(_task_rows("safeloop_cn")) or 108)], index=0,
-                label_visibility="collapsed")
+            mode = st.radio("检测方式", ["标准检测", "智能引导", "对比检测"],
+                            index=0, label_visibility="collapsed",
+                            help="标准：测试员自主多轮；引导：判别信号参与策略"
+                                 "（实验性）；对比：两者都跑并给出对比结论")
+            _mode_hints = {
+                "标准检测": "测试员自主多轮测试，全程记录证据 · 适合首次使用",
+                "智能引导": "<span class='sl-pill live'>实验</span>"
+                            "安全判别结果参与下一轮测试策略引导",
+                "对比检测": "两种模式都跑，报告直接对比引导是否有效 · 用时约 2 倍",
+            }
+            st.markdown("<div class='sl-meta' style='margin:2px 0 10px'>{}</div>"
+                        .format(_mode_hints[mode]), unsafe_allow_html=True)
+            suite_opt = st.radio("任务集", ["国际基准 JBB-100", "中文检测"],
+                                 index=0, label_visibility="collapsed",
+                                 help="国际基准为英文原版题库，用于研究对照；"
+                                      "中文检测基于 JailBench 国标五类风险")
+            st.markdown(
+                "<div class='sl-meta' style='margin:2px 0 10px'>{}</div>".format(
+                    "英文原版题库 · 100 场景 · 研究与基准对照"
+                    if "国际" in suite_opt else
+                    "JailBench 全量 {} 场景 · 国标五类风险 · 适合中文模型".format(
+                        len(_task_rows("safeloop_cn")) or 108)),
+                unsafe_allow_html=True)
             suite_v = "jbb100" if "国际" in suite_opt else "safeloop_cn"
             rows = _task_rows(suite_v)
             n_all = len(rows) or 100
-            scope_opt = st.radio("检测范围", [
-                "快速检测（推荐）—— 跨风险类别抽样",
-                "完整检测 —— 全部 {} 个场景（耗时长）".format(n_all),
-                "指定场景 —— 单个场景反复多轮，深度测试"], index=0,
-                label_visibility="collapsed")
+            scope_opt = st.radio("检测范围", ["快速检测", "完整检测", "指定场景"],
+                                 index=0, label_visibility="collapsed",
+                                 help="快速：跨类别抽样；完整：全部场景；"
+                                      "指定：单场景反复多轮")
+            st.markdown(
+                "<div class='sl-meta' style='margin:2px 0 10px'>{}</div>".format({
+                    "快速检测": "跨风险类别均匀抽取 · 下方选择数量",
+                    "完整检测": "全部 {} 个场景 · 耗时较长，建议先用快速检测验证链路"
+                                .format(n_all),
+                    "指定场景": "选一个场景反复多轮 · 深度测试",
+                }[scope_opt]), unsafe_allow_html=True)
             scenario_id = None
             if scope_opt.startswith("快速"):
                 scope_v, n_tasks = "sample", st.slider("场景数量", 2, 20, 3)
@@ -392,8 +417,12 @@ with tab0:
                     format_func=lambda i: "{} ｜ {}".format(
                         items[i]["task_id"], (items[i].get("goal") or "")[:44]))
                 scenario_id = items[si]["task_id"]
-            rounds_v = st.slider("每个场景测试轮数", 1, 10, 3)
-            with st.expander("高级（v1.1 实验能力，默认关闭）"):
+            rounds_v = st.slider(
+                "每个场景测试轮数", 1, 10, 3,
+                help="调用次数 = 场景数 × 轮数（对比模式翻倍）；"
+                     "红方与裁判为本地推理，不计 API 费用")
+            with st.expander("高级选项"):
+                st.caption("实验能力，默认关闭 · 不影响标准模式语义")
                 use_memory = st.checkbox("使用历史测试经验（长期记忆，round 1+ 生效）",
                                          value=False,
                                          help="跨 run 积累的过程观察经验；不含任何"
@@ -405,18 +434,18 @@ with tab0:
                          "开启后报告使用 D(Q)/Yield 口径")
             est_calls = n_tasks * rounds_v * (2 if "对比检测" in mode else 1)
             lo, hi = int(est_calls * 0.7), int(est_calls * 1.5)
-            st.caption("预计目标模型调用 ≈ {} 次；耗时约 {}。"
-                       "另有红方/裁判本地推理，不产生 API 费用。".format(
-                           est_calls,
-                           "{}-{}".format(
-                               "{:.1f} 小时".format(lo / 60) if lo >= 90 else lo,
-                               "{:.1f} 小时".format(hi / 60) if hi >= 90 else hi)))
+            st.caption("预计目标模型调用 {} 次 · 约 {}".format(
+                est_calls,
+                "{}-{}".format(
+                    "{:.1f} 小时".format(lo / 60) if lo >= 90 else lo,
+                    "{:.1f} 小时".format(hi / 60) if hi >= 90 else hi)))
 
     bA, bB = st.columns([1.4, 1.6])
     with bA:
         start = st.button("开始安全体检", use_container_width=True, type="primary")
     with bB:
-        sample = st.button("载入示例数据（即时，演示数据）", use_container_width=True)
+        sample = st.button("载入示例数据", use_container_width=True,
+                           help="即时加载真实研究数据作为演示，非现场运行")
 
     if sample:
         st.session_state.agent = None
@@ -484,12 +513,12 @@ with tab0:
                 "<span class='dot' style='{}'></span>{} · {}"
                 "<span>对话 <span class='val'>{}</span>/<span class='val'>{}</span></span>"
                 "<span>已用 <span class='val'>{}</span></span>"
-                "<span class='right'>{}</span></div>".format(
+                "<span class='right' title='{}'>…{}</span></div>".format(
                     "background:#f5b942;box-shadow:0 0 10px rgba(245,185,66,.8)"
                     if r["status"] in ("QUEUED", "CANCELLING") else "",
                     "LIVE" if r["status"] == "RUNNING" else r["status"], state_zh,
                     r["steps_done"], r["total_steps"] or "?",
-                    _fmt_elapsed(max(0, elapsed)), rid),
+                    _fmt_elapsed(max(0, elapsed)), rid, rid[-6:]),
                 unsafe_allow_html=True)
         with _c2:
             st.progress(min(1.0, (r["steps_done"] or 0) /
@@ -587,11 +616,11 @@ with tab0:
             nodes = trajectory_to_nodes(demo)
             _pc, _ac = st.columns([2.6, 1])
             with _ac:
-                if st.button("自动播放（逐轮推进）", use_container_width=True):
+                if st.button("自动播放", use_container_width=True):
                     _cur = st.session_state.get("live_step", len(nodes))
                     st.session_state["autoplay_left"] = len(nodes) - _cur
                     st.rerun()
-            max_step = st.slider("演示进度（逐轮推进）", 1, len(nodes),
+            max_step = st.slider("演示进度", 1, len(nodes),
                                  st.session_state.get("live_step", len(nodes)),
                                  key="live_step")
             _c1, _c2, _c3 = st.columns([1, 2.5, 1.5])
@@ -599,13 +628,17 @@ with tab0:
                 st.markdown("**智能体状态坞**")
                 st.markdown(
                     "<div class='sl-card' style='padding:12px 16px'>"
-                    "<div class='sl-meta' style='line-height:2.1'>"
-                    "✅ 主智能体 · 已规划<br>"
-                    "{} 红方测试员<br>"
-                    "👁 裁判 · 观察中<br>"
-                    "{} 独立评审官</div></div>".format(
-                        "🟢" if max_step < len(nodes) else "✅",
-                        "✅" if max_step == len(nodes) else "⏳"),
+                    "<div class='sl-meta' style='line-height:2.3'>"
+                    "{c1} 主智能体 · 已规划<br>"
+                    "{c2} 红方测试员<br>"
+                    "{c3} 裁判 · 观察中<br>"
+                    "{c4} 独立评审官</div></div>".format(
+                        c1=icon("check", 13, "#16875d"),
+                        c2=icon("play", 11, "#7556d8" if max_step < len(nodes)
+                                else "#16875d"),
+                        c3=icon("pulse", 13, "#2f6feb"),
+                        c4=icon("shield", 13, "#16875d" if max_step == len(nodes)
+                                else "#9db0c9")),
                     unsafe_allow_html=True)
                 demo_dom = (demo.task.metadata or {}).get("feedback_observability")
                 with st.expander("当前任务在系统中的位置"):
@@ -763,8 +796,9 @@ with tab2:
             "<div class='sl-card' style='margin-top:14px'>"
             "<b>⚖️ 独立评审官最终裁决</b><br>"
             "<span style='color:{c};font-weight:700'>{v}</span><br>"
-            "<span class='sl-meta'>独立评审官不参与测试过程、不受测试策略影响，"
-            "仅依据「原始目标 + 模型回答」做最终裁决，避免既当运动员又当裁判。</span></div>"
+            "<span class='sl-meta' title='独立评审官不参与测试过程、不受测试策略影响，"
+            "仅依据「原始目标 + 模型回答」做最终裁决'>"
+            "闭环之外 · 仅依据原始目标与模型回答裁决</span></div>"
             .format(c="var(--risk)" if final_ok else "var(--safe)",
                     v=("风险确认：{} 轮测试中模型至少一次给出风险回答。".format(
                         len(traj.steps)) if final_ok
