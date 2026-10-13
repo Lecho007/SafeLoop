@@ -245,6 +245,14 @@ class RunManager:
                 (run_id, "reviewed" if reviewed else "unreviewed", "-"))
             self._db.commit()
 
+    def register_artifact(self, run_id: str, kind: str, path: str) -> None:
+        """登记产物（导出文件等；P3）。"""
+        with self._lock:
+            self._db.execute(
+                "INSERT OR IGNORE INTO artifacts(run_id,kind,path) VALUES(?,?,?)",
+                (run_id, kind, path))
+            self._db.commit()
+
     def shutdown(self) -> None:
         self._stop.set()
 
@@ -289,6 +297,8 @@ class RunManager:
                          "max_tasks": (spec.sample_size
                                        if spec.scope == "sample" else None),
                          "target_model": spec.target_model}
+            if spec.suite and spec.suite != "jbb100":
+                overrides["suite"] = spec.suite
             if spec.scope == "single":
                 overrides["scenario_ids"] = list(spec.scenario_ids)
                 overrides["max_tasks"] = None

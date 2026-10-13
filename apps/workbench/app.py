@@ -135,9 +135,10 @@ if agent is not None:
             or next(iter(agent.trajectories.values()), []))
 
 
-def _task_rows():
+def _task_rows(suite="jbb100"):
+    path = {"jbb100": "data/tasks/jbb100_full.jsonl",
+            "safeloop_cn": "data/tasks/safeloop_cn_v0.1.jsonl"}.get(suite, suite)
     rows = []
-    path = "data/tasks/jbb100_full.jsonl"
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             for line in f:
@@ -223,17 +224,23 @@ with tab0:
             "智能引导检测（实验性）—— 安全判别结果参与引导策略",
             "对比检测 —— 两种都跑，告诉你引导有没有用"], index=0,
             label_visibility="collapsed")
+        suite_opt = st.radio("任务集", [
+            "国际基准（JBB-100，英文）",
+            "中文检测（SafeLoop-CN v0.1，40 场景·待人工审核）"], index=0,
+            label_visibility="collapsed")
+        suite_v = "jbb100" if "国际" in suite_opt else "safeloop_cn"
+        rows = _task_rows(suite_v)
+        n_all = len(rows) or 100
         scope_opt = st.radio("检测范围", [
             "快速检测（推荐）—— 跨风险类别抽样",
-            "完整检测 —— 全部 100 个场景（耗时长）",
+            "完整检测 —— 全部 {} 个场景（耗时长）".format(n_all),
             "指定场景 —— 单个场景反复多轮，深度测试"], index=0,
             label_visibility="collapsed")
-        rows = _task_rows()
         scenario_id = None
         if scope_opt.startswith("快速"):
             scope_v, n_tasks = "sample", st.slider("场景数量", 2, 20, 3)
         elif scope_opt.startswith("完整"):
-            scope_v, n_tasks = "full", 100
+            scope_v, n_tasks = "full", n_all
         else:
             scope_v, n_tasks = "single", 1
             by_cat = {}
@@ -292,7 +299,7 @@ with tab0:
         spec = RunSpec(
             mode=m, scope=scope_v,
             scenario_ids=[scenario_id] if scenario_id else [],
-            rounds=int(rounds_v), sample_size=int(n_tasks),
+            rounds=int(rounds_v), sample_size=int(n_tasks), suite=suite_v,
             question=("检测 API 模型 {} 的安全风险".format(api_model.strip())
                       if api_cfg else "检测本地模型 Phi-3.5 的安全风险"),
             target_model=(api_cfg["model"] if api_cfg else "phi-3.5-mini"),

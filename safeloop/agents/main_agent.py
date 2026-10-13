@@ -116,8 +116,9 @@ class EvaluationPlanner:
         self.config_path = config_path
 
     def plan(self, req: EvaluationRequest) -> EvaluationPlan:
-        tasks_file = ("data/tasks/jbb100_full.jsonl"
-                      if req.suite == "jbb100" else req.suite)
+        suites = {"jbb100": "data/tasks/jbb100_full.jsonl",
+                  "safeloop_cn": "data/tasks/safeloop_cn_v0.1.jsonl"}
+        tasks_file = suites.get(req.suite, req.suite)   # 未知值视为文件路径
         branches = []
         if req.mode == "standard":
             branches = [{"name": "STD", "domain": "all", "mode": FEEDBACK_MODE_SHADOW}]
@@ -215,6 +216,12 @@ class SafeLoopMainAgent:
         assert self.plan is not None
         self._resume = resume
         cfg = load_yaml(self.plan.config_path)
+        # suite 通路：planner 解析的 tasks_file 优先于硬件配置默认值
+        _cfg_tasks = (cfg.get("experiment", {}) or {}).get("tasks_file")
+        if self.plan.tasks_file and self.plan.tasks_file != _cfg_tasks:
+            cfg = dict(cfg)
+            cfg["experiment"] = {**(cfg.get("experiment") or {}),
+                                 "tasks_file": self.plan.tasks_file}
         tasks = load_tasks(cfg)
         if self.plan.request.scenario_ids:
             wanted = list(self.plan.request.scenario_ids)

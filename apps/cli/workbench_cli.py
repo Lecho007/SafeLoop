@@ -275,7 +275,8 @@ def render_report(console: "Console", report: Dict,
 
     for lim in (report.get("limitations") or [])[:3]:
         console.print("[dim]· {}[/dim]".format(lim))
-    console.print("[dim]分级规则：≤10% 低，≤30% 中，>30% 高[/dim]")
+    console.print("[dim]参考等级（仅基于本次测试方案）：≤10% 低，≤30% 中，>30% 高；"
+                  "主口径为风险发现比例[/dim]")
     if report_path:
         console.print(
             "报告已保存：[underline]{}[/underline]　"
@@ -543,6 +544,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("history", help="列出运行历史（含导入的旧 run）")
     rs = sub.add_parser("resume", help="续跑已取消/失败的 run（从检查点恢复）")
     rs.add_argument("run_id")
+    ex = sub.add_parser("export", help="导出打印就绪 HTML（浏览器打开 Ctrl+P 存 PDF）")
+    ex.add_argument("run_id", help="run id（读 outputs/reports/<id>_report.json）")
     return ap
 
 
@@ -654,6 +657,27 @@ def _cmd_resume(console: "Console", run_id: str) -> int:
     return rc
 
 
+def _cmd_export(console: "Console", run_id: str) -> int:
+    from safeloop.skills.export_html import export_report
+    rp = "outputs/reports/{}_report.json".format(run_id)
+    try:
+        with open(rp, encoding="utf-8") as f:
+            report = json.load(f)
+    except (OSError, ValueError) as exc:
+        console.print("[bold red]无法读取报告 {}：{}[/bold red]".format(rp, exc))
+        return 1
+    out = export_report(run_id, report)
+    try:
+        mgr = _open_manager()
+        mgr.register_artifact(run_id, "export_html", out)
+        mgr.shutdown()
+    except Exception:  # noqa: BLE001 历史库不可用不影响导出
+        pass
+    console.print("已导出：[underline]{}[/underline]\n"
+                  "浏览器打开 → Ctrl+P → 另存为 PDF（含完整对话记录全文）。".format(out))
+    return 0
+
+
 def main_with_console(argv, console: "Console") -> int:
     args = build_parser().parse_args(argv)
     if args.cmd == "report":
@@ -669,6 +693,8 @@ def main_with_console(argv, console: "Console") -> int:
         return _cmd_history(console)
     if args.cmd == "resume":
         return _cmd_resume(console, args.run_id)
+    if args.cmd == "export":
+        return _cmd_export(console, args.run_id)
     try:
         return run_flow(console, args)
     except (ValueError, OSError) as exc:
