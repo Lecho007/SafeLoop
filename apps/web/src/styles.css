@@ -201,6 +201,19 @@ body::after {
 /* ---------- Element Plus 融合微调 ---------- */
 .el-segmented { --el-border-radius-base: 999px; background: rgba(255,255,255,.55); }
 .el-segmented__item { border-radius: 999px !important; font-weight: 600; padding: 0 16px; }
+/* 输入/下拉融入玻璃：半透明底 + 柔和内描边（不再是白盒套白盒） */
+.el-select__wrapper, .el-input__wrapper {
+  background: rgba(255, 255, 255, .55);
+  box-shadow: 0 0 0 1px rgba(199, 210, 226, .9) inset;
+  border-radius: 10px;
+}
+.el-select__wrapper.is-hovering { box-shadow: 0 0 0 1px #9fb3d1 inset; }
+.el-select__wrapper.is-focused, .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--blue) inset; }
+.el-select__input { background: transparent; border: none; }
+/* 选中文字超长省略（长任务名不再撑破/溢出下拉框） */
+.el-select__placeholder span { display: block; max-width: 100%; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; }
 .el-slider__runway { height: 6px; }
 .el-slider__button { width: 16px; height: 16px; border: 2px solid var(--blue);
   box-shadow: 0 2px 6px rgba(47, 111, 235, .3); }
