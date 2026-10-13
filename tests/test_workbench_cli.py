@@ -170,11 +170,19 @@ class TestEmptyAnswerMarker(unittest.TestCase):
         agent = NS(live_events=[{"branch": "STD", "round": 1, "strategy": "direct",
                                  "prompt": "q", "response": "", "advancement": None,
                                  "safety": "Unsafe", "success": False}],
-                   state="RUNNING")
+                   state="RUNNING", trajectories={})
+        r = {"status": "RUNNING", "steps_done": 0, "total_steps": 9}
         buf = io.StringIO()
         console = wc.Console(file=buf, width=80)
-        console.print(wc.live_frame(agent, 9, 0.0))
+        console.print(wc.live_frame(r, agent, 0.0))
         self.assertIn("（空回答）", buf.getvalue())
+
+    def test_live_frame_queued_placeholder(self):
+        r = {"status": "QUEUED", "steps_done": 0, "total_steps": 9}
+        buf = io.StringIO()
+        console = wc.Console(file=buf, width=80)
+        console.print(wc.live_frame(r, None, 0.0))
+        self.assertIn("排队中", buf.getvalue())
 
 
 class TestApiTargetParse(unittest.TestCase):

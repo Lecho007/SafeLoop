@@ -35,8 +35,8 @@ from rich.table import Table
 from rich.text import Text
 
 from terms import CATEGORY_ZH, STRATEGY_ZH, compare_verdict, risk_grade, stars
-
-MODE_ZH = {"standard": "标准检测", "guided": "智能引导", "compare": "对比检测"}
+from safeloop.skills.transcript import (MODE_ZH, build_transcript,  # noqa: F401
+                                        e_short, verdict_short)
 SCOPE_ZH = {"sample": "抽样测试", "full": "完整测试", "single": "单场景测试"}
 # terms.risk_grade 返回语义色名，映射到 rich 样式
 RICH_OF = {"red": "bold red", "amber": "yellow", "green": "green", "gray": "dim"}
@@ -90,16 +90,6 @@ def count_empty_answers(trajectories) -> int:
 def _step_ok(s) -> bool:
     ev = getattr(s, "external_evaluation", None)
     return bool(ev and getattr(ev, "success", False))
-
-
-def verdict_short(s) -> str:
-    meta = getattr(s.judge_output, "metadata", None) or {}
-    return (meta.get("advancement") or meta.get("safety")
-            or getattr(s.judge_output, "outcome", None) or "—")
-
-
-def e_short(s) -> str:
-    return "风险确认" if _step_ok(s) else "未触发"
 
 
 def scenario_block(traj) -> List[str]:
@@ -222,37 +212,6 @@ def fmt_elapsed(seconds: float) -> str:
     return "{:02d}:{:02d}".format(int(seconds) // 60, int(seconds) % 60)
 
 
-def build_transcript(run_id: str, mode: str, branches) -> str:
-    """完整对话存档（无截断）：每场景逐轮的红方问题/被测回答全文 + 判别 + E 结论。"""
-    lines = ["# SafeLoop 完整对话记录", "",
-             "- run: {} ｜ 模式: {}".format(run_id, MODE_ZH.get(mode, mode)),
-             "- 内容：全部场景、逐轮红方问题与被测回答**全文**（不截断）、裁判判别、独立评审结论", ""]
-    for branch, trajs in branches:
-        lines += ["", "---", "", "## 分支 {}（{} 个场景）".format(branch, len(trajs)), ""]
-        for n, t in enumerate(trajs, 1):
-            cat = (getattr(t.task, "harm_category", "") or "").replace("JBB:", "")
-            zh = CATEGORY_ZH.get(cat, cat or "未分类")
-            first = next((k + 1 for k, s in enumerate(t.steps) if _step_ok(s)), None)
-            dom = (getattr(t.task, "metadata", {}) or {}).get("feedback_observability") or "—"
-            tag = "第{}轮触发".format(first) if first else "未触发"
-            lines += ["## [{}/{}] {} ｜ {}（{}） ｜ 域: {}".format(
-                n, len(trajs), t.task.task_id, zh, tag, dom), ""]
-            lines += ["**测试目标（全程固定）**：{}".format(
-                getattr(t.task, "goal", "") or "（未记录）"), ""]
-            for s in t.steps:
-                strat = getattr(s.action, "strategy", None)
-                lines += ["### R{} ｜ {} ｜ 判别: {} ｜ E: {}".format(
-                    getattr(s, "round_id", 0) + 1, STRATEGY_ZH.get(strat, strat or "?"),
-                    verdict_short(s), e_short(s)), "", "**红方问题**", "", "```text",
-                    (getattr(s.action, "prompt", "") or "（空）"), "```", "",
-                    "**被测回答**", "", "```text"]
-                ans = (getattr(s.response, "text", "") or "").strip()
-                lines += [ans if ans else
-                          "（空回答——回答预算内无最终内容：多为思考耗尽 finish=length 或上游拦截）",
-                          "```", ""]
-    return "\n".join(lines) + "\n"
-
-
 def _detail_blocks(lines: List[str]) -> List[List[str]]:
     blocks, cur = [], []
     for ln in lines:
@@ -323,64 +282,80 @@ def render_report(console: "Console", report: Dict,
             "查看：python -m json.tool {} | less".format(report_path, report_path))
 
 
-def live_frame(agent, total: int, t0: float, recent: int = 8, multi_branch: bool = False):
-    done = len(agent.live_events)
+def live_frame(r: Dict, agent, t0: float, recent: int = 8):
+    """运行画面：状态行取自 RunManager 持久化进度，对话流取自活动 agent。"""
+    done = r.get("steps_done", 0)
+    total = max(1, r.get("total_steps", 1))
     grid = Table.grid(padding=(0, 1))
     grid.add_column()
     grid.add_row(Text("状态 {} ｜ 进度 {}/{}  {} ｜ 已用 {}".format(
-        agent.state, done, total, progress_bar(done, total),
+        r.get("status"), done, total, progress_bar(done, total),
         fmt_elapsed(time.time() - t0)), style="bold"))
-    for ev in agent.live_events[-recent:]:
-        tag = "［{}］".format(ev.get("branch", "")) if multi_branch else ""
+    events = (getattr(agent, "live_events", None) or []) if agent else []
+    if not events:
+        grid.add_row(Text("排队中 / 模型加载中…首轮对话完成后在此显示", "dim"))
+        if r.get("status") == "QUEUED":
+            grid.add_row(Text("（单 GPU 串行队列：前序任务完成后自动开始）", "dim"))
+    multi = agent is not None and len(getattr(agent, "trajectories", {}) or {}) > 1
+    for ev in events[-recent:]:
+        tag = "［{}］".format(ev.get("branch", "")) if multi else ""
         grid.add_row(Text.assemble(("● ", dot_color(ev)),
                                    (tag + round_line(ev), "bold")))
         grid.add_row(Text("  问 " + _clip(ev.get("prompt"), PROMPT_CLIP), "dim"))
         ans = _clip(ev.get("response"), RESPONSE_CLIP)
         grid.add_row(Text("  答 " + (ans or EMPTY_ANSWER), "dim"))
-    return Panel(grid, title="SafeLoop 运行中（Ctrl+C 中断）",
+    return Panel(grid, title="SafeLoop 运行中（Ctrl+C 取消）",
                  border_style="cyan", expand=False)
 
 
 # ------------------------------------------------------------------ 运行控制
-def run_with_live(agent, total: int, console: "Console", plain: bool) -> int:
+def run_with_live(mgr, run_id: str, console: "Console", plain: bool) -> int:
+    """跟随 RunManager 队列中的 run：轮询持久化状态；Ctrl=C 走真取消。"""
+    from safeloop.runs.manager import TERMINAL
     t0 = time.time()
-
-    def _worker():
-        try:
-            agent.run()
-        except Exception as exc:  # noqa: BLE001 —— 与 API 服务器的 _run_safe 一致
-            agent._set_state("FAILED")
-            agent._emit("error", message=str(exc)[:300])
-
-    th = threading.Thread(target=_worker, daemon=True)
-    th.start()
     seen = 0
     try:
         if plain:  # 非 tty（重定向/日志）：不刷新画面，逐条追加
-            while th.is_alive():
-                th.join(timeout=0.5)
-                for ev in agent.live_events[seen:]:
-                    console.print("● " + round_line(ev))
-                    console.print("  问 " + _clip(ev.get("prompt"), PROMPT_CLIP))
-                    ans = _clip(ev.get("response"), RESPONSE_CLIP)
-                    console.print("  答 " + (ans or EMPTY_ANSWER))
-                seen = len(agent.live_events)
+            while True:
+                r = mgr.get_run(run_id)
+                agent = mgr.get_agent(run_id)
+                if agent:
+                    for ev in agent.live_events[seen:]:
+                        console.print("● " + round_line(ev))
+                        console.print("  问 " + _clip(ev.get("prompt"), PROMPT_CLIP))
+                        ans = _clip(ev.get("response"), RESPONSE_CLIP)
+                        console.print("  答 " + (ans or EMPTY_ANSWER))
+                    seen = len(agent.live_events)
+                if r["status"] in TERMINAL:
+                    break
+                time.sleep(0.5)
         else:
             with Live(console=console, refresh_per_second=2) as live:
-                while th.is_alive():
-                    th.join(timeout=0.4)
-                    live.update(live_frame(agent, total, t0))
+                while True:
+                    r = mgr.get_run(run_id)
+                    agent = mgr.get_agent(run_id)
+                    live.update(live_frame(r, agent, t0))
+                    if r["status"] in TERMINAL:
+                        break
+                    time.sleep(0.4)
     except KeyboardInterrupt:
-        agent.cancel()
-        console.print("\n[yellow]已请求中断，退出。[/yellow]")
+        res = mgr.cancel(run_id)
+        console.print("\n[yellow]已请求取消：{}[/yellow]".format(
+            res.get("note", "当前调用结束或超时后生效，已完成结果保留。")))
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            if mgr.get_run(run_id)["status"] in TERMINAL:
+                break
+            time.sleep(0.2)
         return 130
-    err = next((e.get("message") for e in agent.events
-                if e.get("kind") == "error"), None)
-    if agent.state == "FAILED":
-        console.print("\n[bold red]运行失败：{}[/bold red]".format(err or "未知错误"))
+    r = mgr.get_run(run_id)
+    if r["status"] == "FAILED":
+        console.print("\n[bold red]运行失败：{}[/bold red]".format(
+            r.get("error") or "未知错误"))
         return 1
-    if agent.report is None:
-        console.print("\n[yellow]已取消，未生成报告。[/yellow]")
+    if r["status"] == "CANCELLED":
+        console.print("\n[yellow]已取消。已完成的部分结果保留在历史中"
+                      "（可用 resume 子命令续跑）。[/yellow]")
         return 130
     return 0
 
@@ -565,58 +540,29 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd")
     rp = sub.add_parser("report", help="终端重新渲染已保存的报告 JSON")
     rp.add_argument("path", help="outputs/reports/ 下的报告文件")
+    sub.add_parser("history", help="列出运行历史（含导入的旧 run）")
+    rs = sub.add_parser("resume", help="续跑已取消/失败的 run（从检查点恢复）")
+    rs.add_argument("run_id")
     return ap
 
 
-def run_flow(console: "Console", args) -> int:
-    from safeloop.agents.main_agent import SafeLoopMainAgent
-    sel = ask_missing(console, args)
-    api_cfg, mode = sel["api_cfg"], sel["mode"]
-    scope, n_tasks = sel["scope"], sel["n_tasks"]
-    scenario_id, budget = sel["scenario_id"], sel["budget"]
-    question = args.question or (
-        "检测 API 模型 {} 的安全风险".format(api_cfg["model"]) if api_cfg
-        else "检测本地模型 Phi-3.5 的安全风险")
-    agent = SafeLoopMainAgent(
-        config_path=args.config or "configs/hardware/rtx4060_8g_1br.yaml")
-    overrides = {"mode": mode, "budget_per_task": budget,
-                 "target_model": api_cfg["model"] if api_cfg else "phi-3.5-mini"}
-    if scope == "sample":
-        overrides["max_tasks"] = n_tasks
-        n_effective, scope_desc = n_tasks, "抽样 {} 个场景（跨类别）".format(n_tasks)
-    elif scope == "full":
-        overrides["max_tasks"] = None      # None = 任务集全部场景
-        n_effective, scope_desc = None, "全部场景"
-    else:
-        overrides["max_tasks"] = None
-        overrides["scenario_ids"] = [scenario_id]
-        n_effective, scope_desc = 1, "单场景 {}".format(scenario_id)
-    if api_cfg:
-        overrides["api_target"] = api_cfg
-    plan = agent.submit(question, **overrides)
-    if n_effective is None:
-        n_effective = plan.n_tasks
-    branch_names = [b["name"] for b in plan.branches]
-    total = n_effective * budget * len(branch_names)
-    est = estimate_duration(total)
-    if scope == "full":
-        console.print("[yellow]⚠ 完整测试：{} 个场景 × 每场景 {} 轮 = {} 轮查询，{}。"
-                      "建议先用抽样测试验证链路后再跑全量。[/yellow]".format(
-                          n_effective, budget, total, est))
-    console.print("[bold]体检开始[/bold]：{} ｜ 每场景 {} 轮 ｜ 模式 {} ｜ "
-                  "分支 {} ｜ {}".format(scope_desc, budget, MODE_ZH[mode],
-                                        "/".join(branch_names), est))
-    rc = run_with_live(agent, total, console, plain=not sys.stdout.isatty())
-    if rc != 0:
-        return rc
+def _open_manager():
+    from safeloop.runs.manager import RunManager
+    return RunManager()
+
+
+def _render_finished(console: "Console", mgr, run_id: str, mode: str) -> None:
+    """终态后的统一呈现：报告 + 空回答警示 + transcript 路径（零 GPU 回放装载）。"""
+    from safeloop.skills.replay_loader import load_prerun_as_agent
+    a = load_prerun_as_agent(run_id)
     primary = "GUI" if mode == "guided" else "STD"
-    trajs = agent.trajectories.get(primary) or []
+    trajs = a.trajectories.get(primary) or []
     if not trajs:
-        for v in agent.trajectories.values():
+        for v in a.trajectories.values():
             trajs = trajs or v
     detail_lines = scenario_details(trajs)[0] if trajs else None
-    render_report(console, agent.report, detail_lines=detail_lines,
-                  report_path="outputs/reports/{}_report.json".format(agent.run_id),
+    render_report(console, a.report, detail_lines=detail_lines,
+                  report_path="outputs/reports/{}_report.json".format(run_id),
                   primary_note="STD 分支" if (mode == "compare" and trajs) else None)
     if trajs:
         n_empty, n_rounds = count_empty_answers(trajs), sum(
@@ -626,13 +572,86 @@ def run_flow(console: "Console", args) -> int:
                 "[yellow]⚠ {}/{} 轮回答为空：被测端在该回答预算内没有产出内容"
                 "（截断或上游过滤），这些轮不计入风险，本次结论会低估风险，"
                 "建议调大回答预算后重跑。[/yellow]".format(n_empty, n_rounds))
-    transcript = build_transcript(agent.run_id, mode,
-                                  sorted(agent.trajectories.items()))
-    tpath = "outputs/reports/{}_transcript.md".format(agent.run_id)
-    with open(tpath, "w", encoding="utf-8") as f:
-        f.write(transcript)
-    console.print("完整对话记录（问答全文、无截断）：[underline]{}[/underline]".format(tpath))
+    r = mgr.get_run(run_id)
+    arts = {x["kind"]: x["path"] for x in r.get("artifacts", [])}
+    if "transcript" in arts:
+        console.print("完整对话记录（问答全文、无截断）：[underline]{}[/underline]".format(
+            arts["transcript"]))
+
+
+def run_flow(console: "Console", args) -> int:
+    from safeloop.runs.manager import RunSpec
+    sel = ask_missing(console, args)
+    api_cfg, mode = sel["api_cfg"], sel["mode"]
+    scope, n_tasks = sel["scope"], sel["n_tasks"]
+    scenario_id, budget = sel["scenario_id"], sel["budget"]
+    question = args.question or (
+        "检测 API 模型 {} 的安全风险".format(api_cfg["model"]) if api_cfg
+        else "检测本地模型 Phi-3.5 的安全风险")
+    mgr = _open_manager()
+    spec = RunSpec(
+        mode=mode, scope=scope,
+        scenario_ids=[scenario_id] if scenario_id else [],
+        rounds=budget, sample_size=n_tasks or 3, suite=args.suite,
+        question=question,
+        target_model=api_cfg["model"] if api_cfg else "phi-3.5-mini",
+        api_target=api_cfg,
+        config_path=args.config or "configs/hardware/rtx4060_8g_1br.yaml")
+    run_id = mgr.submit(spec)
+    n_effective = 1 if scope == "single" else (n_tasks if scope == "sample" else 100)
+    total = n_effective * budget * (2 if mode == "compare" else 1)
+    est = estimate_duration(total)
+    scope_desc = {"sample": "抽样 {} 个场景（跨类别）".format(n_tasks),
+                  "full": "全部场景", "single": "单场景 {}".format(scenario_id)}[scope]
+    if scope == "full":
+        console.print("[yellow]⚠ 完整测试：约 {} 个场景 × 每场景 {} 轮 ≈ {} 轮查询，{}。"
+                      "建议先用抽样测试验证链路后再跑全量。[/yellow]".format(
+                          n_effective, budget, total, est))
+    console.print("[bold]体检已排队[/bold]：{} ｜ 每场景 {} 轮 ｜ 模式 {} ｜ {} ｜ {}"
+                  .format(scope_desc, budget, MODE_ZH[mode], est, run_id))
+    rc = run_with_live(mgr, run_id, console, plain=not sys.stdout.isatty())
+    if rc == 0:
+        _render_finished(console, mgr, run_id, mode)
+    return rc
+
+
+def _cmd_history(console: "Console") -> int:
+    mgr = _open_manager()
+    rows = mgr.list_runs(limit=30)
+    if not rows:
+        console.print("暂无历史运行。")
+        return 0
+    t = Table(title="运行历史（最近 {}）".format(len(rows)))
+    for col, kw in (("run_id", {"no_wrap": True}), ("状态", {}),
+                    ("模式", {}), ("范围", {}), ("目标", {}),
+                    ("轮数", {"justify": "right"}), ("进度", {"justify": "right"}),
+                    ("创建时间", {})):
+        t.add_column(col, **kw)
+    for r in rows:
+        t.add_row(r["run_id"], r["status"], r["mode"], r["scope"],
+                  str(r["target"] or ""),
+                  "{}/{}".format(r["steps_done"], r["total_steps"] or "?"),
+                  "{}".format(r["rounds"]),
+                  str(r["created_at"] or "")[:19])
+    console.print(t)
+    console.print("[dim]续跑：python apps/cli/workbench_cli.py resume <run_id>"
+                  " ｜ 重看报告：report outputs/reports/<run_id>_report.json[/dim]")
     return 0
+
+
+def _cmd_resume(console: "Console", run_id: str) -> int:
+    mgr = _open_manager()
+    try:
+        mgr.resume(run_id)
+    except (KeyError, ValueError) as exc:
+        console.print("[bold red]{}[/bold red]".format(exc))
+        return 1
+    r = mgr.get_run(run_id)
+    console.print("[bold]已重新排队[/bold]：{}（从检查点续跑）".format(run_id))
+    rc = run_with_live(mgr, run_id, console, plain=not sys.stdout.isatty())
+    if rc == 0:
+        _render_finished(console, mgr, run_id, r.get("spec", {}).get("mode", "standard"))
+    return rc
 
 
 def main_with_console(argv, console: "Console") -> int:
@@ -646,6 +665,10 @@ def main_with_console(argv, console: "Console") -> int:
             return 1
         render_report(console, report, report_path=args.path)
         return 0
+    if args.cmd == "history":
+        return _cmd_history(console)
+    if args.cmd == "resume":
+        return _cmd_resume(console, args.run_id)
     try:
         return run_flow(console, args)
     except (ValueError, OSError) as exc:
