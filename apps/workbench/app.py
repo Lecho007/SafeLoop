@@ -259,6 +259,16 @@ with tab0:
                     items[i]["task_id"], (items[i].get("goal") or "")[:44]))
             scenario_id = items[si]["task_id"]
         rounds_v = st.slider("每个场景测试轮数", 1, 10, 3)
+        with st.expander("高级（v1.1 实验能力，默认关闭）"):
+            use_memory = st.checkbox("使用历史测试经验（长期记忆，round 1+ 生效）",
+                                     value=False,
+                                     help="跨 run 积累的过程观察经验；不含任何"
+                                          "独立评估结论；round 0 永不受影响")
+            adaptive_q = st.number_input(
+                "智能分配检测预算（自适应评估模式，0=关闭）", 0, 2000, 0,
+                help="设定总目标查询预算 Q：先全部场景各测 1 轮（基础覆盖），"
+                     "再按覆盖缺口把剩余预算分配给值得继续的场景；"
+                     "开启后报告使用 D(Q)/Yield 口径")
         n_branch = 2 if ("对比" in mode and mode.startswith("对比")) else 1
         est_calls = n_tasks * rounds_v * (2 if "对比检测" in mode else 1)
         est_min = int(est_calls * 0.7), int(est_calls * 1.5)
@@ -303,7 +313,9 @@ with tab0:
             question=("检测 API 模型 {} 的安全风险".format(api_model.strip())
                       if api_cfg else "检测本地模型 Phi-3.5 的安全风险"),
             target_model=(api_cfg["model"] if api_cfg else "phi-3.5-mini"),
-            api_target=api_cfg)
+            api_target=api_cfg,
+            use_memory=bool(use_memory),
+            adaptive_budget=int(adaptive_q) or None)
         rid = mgr.submit(spec)
         st.session_state.active_run = rid
         st.toast("已加入队列：{}——运行期间可继续浏览本页，也可离开后回来".format(rid),

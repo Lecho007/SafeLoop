@@ -42,6 +42,20 @@ class ReportSkill:
         if std and gui:
             comparison = self._compare(std, gui, plan.request.budget_per_task)
         budget = plan.request.budget_per_task
+        adaptive = None
+        if getattr(plan.request, "adaptive_budget", None):
+            queries = sum(len(t.steps) for t in primary)
+            adaptive = {
+                "total_budget": plan.request.adaptive_budget,
+                "queries_used": queries,
+                "per_task_cap": budget,
+                "distinct_risky_tasks": len(risk_tasks),
+                "yield": round(len(risk_tasks) / queries, 4) if queries else None,
+                "under_tested_tasks": sum(
+                    1 for t in primary if len(t.steps) < budget),
+                "note": ("自适应预算口径（D(Q)/Yield）：各任务轮数不齐，"
+                         "ASR@cap 不可跨条件直接比较"),
+            }
 
         return {
             "run_id": run_id,
@@ -61,6 +75,7 @@ class ReportSkill:
             "risk_distribution": dict(cats.most_common()),
             "representative_cases": cases,
             "comparison": comparison,
+            "adaptive": adaptive,
             "configuration": {"budget_per_task": plan.request.budget_per_task,
                               "suite": plan.request.suite,
                               "branches": plan.branches,

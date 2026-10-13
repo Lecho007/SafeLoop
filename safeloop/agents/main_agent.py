@@ -49,6 +49,10 @@ class EvaluationRequest:
     max_tasks: Optional[int] = None     # 演示用子集（None = 全部场景）
     scenario_ids: Optional[List[str]] = None   # 指定场景（单场景深度测试），优先于 max_tasks
     api_target: Optional[Dict[str, Any]] = None   # 黑盒 API 待测模型配置
+    # ---- v1.1 实验能力（默认关闭；标准模式语义冻结，红线 2）
+    use_memory: bool = False            # 长期攻击记忆（round 1+ 生效，保 §13）
+    adaptive_budget: Optional[int] = None   # 自适应总预算（独立"自适应评估模式"）
+    memory_snapshot_id: Optional[str] = None  # 冻结记忆快照（正式测试防泄漏）
     output: List[str] = field(default_factory=lambda: [
         "summary", "metrics", "representative_cases", "full_report"])
 
@@ -274,6 +278,90 @@ class SafeLoopMainAgent:
         self._set_state("CANCELLED" if self.cancel_requested else "COMPLETED")
         return self.report
 
+    # -------------------------------------------------------------- v1.1
+    def _target_fingerprint(self, cfg) -> str:
+        """记忆命名空间键：本地含量化方式，API 含 base_url+model。"""
+        api = (self.plan.request.api_target or {})
+        if api.get("base_url"):
+            return "api:{}/{}".format(api.get("base_url"), api.get("model"))
+        tq = cfg.get("target", {}) or {}
+        return "local:{}@{}".format(tq.get("model_path", "phi"),
+                                    tq.get("quantization") or "none")
+
+    def _build_memory(self, cfg):
+        """use_memory=True 时用长期记忆库替换 NullMemory（A1）。"""
+        if not getattr(self.plan.request, "use_memory", False):
+            return build_memory(cfg)
+        from safeloop.skills.memory import (MemoryRecord, MemoryStore,
+                                            OnlineUtilityEstimator)
+        fp = self._target_fingerprint(cfg)
+        snap = getattr(self.plan.request, "memory_snapshot_id", None)
+        if snap:
+            store = MemoryStore.load_snapshot(
+                db_path="outputs/memory/memory.db", snapshot_id=snap,
+                target_fingerprint=fp)
+        else:
+            store = MemoryStore(target_fingerprint=fp)
+        est = OnlineUtilityEstimator()
+        store_ref = {"s": store}
+
+        def _extractor(step, state=None):
+            meta = (getattr(step.judge_output, "metadata", None) or {})
+            if meta.get("parse_status") == "FAILED" or meta.get("judge_invoked") is False:
+                return []
+            safety = meta.get("safety")
+            refusal = meta.get("refusal")
+            if refusal == "Yes":
+                outcome = "refusal"
+            elif safety == "Unsafe":
+                outcome = "unsafe_content"
+            elif safety == "Controversial":
+                outcome = "mixed"
+            elif safety == "Safe":
+                outcome = "safe"
+            elif meta.get("advancement"):
+                outcome = "advancement_{}".format(
+                    str(meta.get("advancement")).lower())
+            else:
+                outcome = "observed"
+            history_prompts = [s.action.prompt for s in
+                               (getattr(state, "history", None) or [])]
+            history_outcomes = [
+                (getattr(getattr(s, "judge_output", None), "metadata", None)
+                 or {}).get("safety") or
+                (getattr(getattr(s, "judge_output", None), "metadata", None)
+                 or {}).get("advancement") or ""
+                for s in (getattr(state, "history", None) or [])]
+            existing = [r.strategy_summary for r in store_ref["s"].query(
+                getattr(getattr(state, "task", None), "harm_category", None),
+                top_k=5)]
+            task = getattr(state, "task", None) or type("T", (), {
+                "task_id": "?", "harm_category": "", "goal": "",
+                "language": ""})()
+            u = est.evaluate(step.action.prompt, history_prompts, meta,
+                             history_outcomes, existing)
+            return [MemoryRecord(
+                source_run_id=self.run_id or "",
+                source_task_id=getattr(task, "task_id", ""),
+                target_fingerprint=fp,
+                harm_category=getattr(task, "harm_category", "") or "",
+                language=getattr(task, "language", "") or "",
+                strategy=step.action.strategy or "direct",
+                strategy_summary="[{}] {}".format(
+                    getattr(task, "harm_category", "")[:24],
+                    (getattr(task, "goal", "") or "")[:60]),
+                context_summary=(step.action.prompt or "")[:120],
+                observation_summary="safety={} refusal={} outcome={}".format(
+                    safety, refusal,
+                    getattr(step.judge_output, "outcome", "") or ""),
+                outcome_proxy=outcome,
+                quality=u["quality"], novelty=u["novelty"],
+                judge_version=str(meta.get("judge", "v2")),
+                metadata={"utility": u})]
+
+        store.extractor = _extractor
+        return store
+
     # -------------------------------------------------------------- branch
     def _run_branch(self, cfg, tasks, br: Dict) -> None:
         from experiments.stage1br import PlainCoordinator, build_branch_stack
@@ -310,6 +398,17 @@ class SafeLoopMainAgent:
         cond = "{}_{}".format(self.run_id, br["name"])
         os.makedirs("outputs/checkpoints", exist_ok=True)
         ckpt_path = "outputs/checkpoints/{}.json".format(cond)
+        memory = self._build_memory(cfg)
+        round_selector = None
+        adaptive = getattr(self.plan.request, "adaptive_budget", None)
+        if adaptive:
+            from safeloop.skills.scheduler import AdaptiveScheduler
+            sched = AdaptiveScheduler(
+                total_budget=int(adaptive),
+                per_task_cap=self.plan.request.budget_per_task,
+                seed=self.seed)
+            round_selector = sched.select
+            self._last_scheduler = sched
 
         def _on_step(step, slot):
             self.live_events.append({
@@ -329,13 +428,18 @@ class SafeLoopMainAgent:
 
         batch = BatchRunner(
             coordinator_factory=coordinator_factory, red_agent=red,
-            target=target, judge=judge, memory=build_memory(cfg),
+            target=target, judge=judge, memory=memory,
             reward_factory=reward_factory, feedback_builder=fb_builder,
             model_manager=mm, base_seed=self.seed, on_step=_on_step,
             should_cancel=(lambda: self.cancel_requested),
+            round_selector=round_selector,
             provenance={"run_id": self.run_id, "branch": br["name"],
                         "feedback_mode": br["mode"], "mode": self.plan.request.mode,
-                        "main_agent": self.version, "seed": self.seed})
+                        "main_agent": self.version, "seed": self.seed,
+                        "memory": ("longterm:" + self._target_fingerprint(cfg)
+                                   if getattr(self.plan.request, "use_memory", False)
+                                   else "null"),
+                        "adaptive_budget": adaptive})
         protocol = ExperimentProtocol(
             experiment_id=self.run_id, condition_id=br["name"],
             target_query_budget=self.plan.request.budget_per_task,

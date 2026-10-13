@@ -22,6 +22,6 @@ class BaseMemory(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, step: AttackStep) -> None:
+    def update(self, step: AttackStep, state: AttackState = None) -> None:
         """每轮结束后写入记忆。"""
         raise NotImplementedError

@@ -75,6 +75,9 @@ class RunSpec:
     api_target: Optional[Dict] = None         # {provider,base_url,model,api_key_env}
     save_transcript: bool = True
     generate_report: bool = True
+    # ---- v1.1 实验能力（默认关闭）
+    use_memory: bool = False                  # 长期攻击记忆
+    adaptive_budget: Optional[int] = None     # 自适应评估模式的总查询预算
 
 
 def _now() -> str:
@@ -299,6 +302,10 @@ class RunManager:
                          "target_model": spec.target_model}
             if spec.suite and spec.suite != "jbb100":
                 overrides["suite"] = spec.suite
+            if spec.use_memory:
+                overrides["use_memory"] = True
+            if spec.adaptive_budget:
+                overrides["adaptive_budget"] = int(spec.adaptive_budget)
             if spec.scope == "single":
                 overrides["scenario_ids"] = list(spec.scenario_ids)
                 overrides["max_tasks"] = None

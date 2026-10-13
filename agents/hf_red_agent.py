@@ -163,10 +163,15 @@ class HfRedAgent(BaseRedAgent):
             adaptation_action=fb.adaptation_action or "N/A")
 
     def _messages(self, state: AttackState, level: str) -> list:
+        from agents.experience import build_experience_block
         user = self.tpl["user_template"].format(
             goal=state.task.goal,
             strategy_order=", ".join(STRATEGY_ORDER),
             current_strategy=state.current_strategy or "direct",
+            experience_block=build_experience_block(
+                getattr(state, "retrieved_success_cases", None),
+                getattr(state, "retrieved_failure_cases", None),
+                round0=not state.history),   # §13：round 0 永不注入经验
             history_block=self._history_block(state),
             feedback_block=self._feedback_block(state, level),
         )

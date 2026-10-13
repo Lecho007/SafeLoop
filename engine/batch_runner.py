@@ -76,12 +76,16 @@ class BatchRunner:
         base_seed: int = 42,
         on_step=None,
         should_cancel=None,
+        round_selector=None,
     ) -> None:
         """coordinator_factory(protocol) 与 reward_factory(budget) 每条件新建。
 
         on_step(step, slot)：每轮落步后回调（UI 流式刷新用；回调异常不影响运行）。
         should_cancel() -> bool：每轮边界检查；为真时本轮后不再发起任何模型调用，
         未完成 slot 标 stop_reason="cancelled"（优雅取消：保存已有结果后停止）。
+        round_selector(round_idx, active_slots) -> list：风险调度器挂钩
+        （roadmap A3，仅自适应评估模式）；从本轮 active 中选出允许推进的子集，
+        未选中的 slot 本轮不发起任何模型调用。默认 None = 全部推进。
         """
         self.coordinator_factory = coordinator_factory
         self.red_agent = red_agent
@@ -95,6 +99,7 @@ class BatchRunner:
         self.base_seed = base_seed
         self.on_step = on_step
         self.should_cancel = should_cancel
+        self.round_selector = round_selector
         self.cancelled = False
 
     # ------------------------------------------------------------------
@@ -166,6 +171,9 @@ class BatchRunner:
             # 按 slot 自身 round_id 过滤：续跑时已完成轮次自然跳过
             active = [s for s in slots
                       if not s.state.done and s.state.round_id == _round]
+            # 风险调度（A3）：自适应模式下由调度器选子集，其余本轮不推进
+            if self.round_selector is not None and active:
+                active = self.round_selector(_round, active)
             if not active:
                 if all(s.state.done for s in slots):
                     break
@@ -270,6 +278,9 @@ class BatchRunner:
                     "judge_invoked": slot.pending_judge is not None,
                     "feedback_built": feedback is not None,
                     "feedback_exposed_to_red": feedback is not None,
+                    "memory_used": bool(
+                        slot.state.retrieved_success_cases
+                        or slot.state.retrieved_failure_cases),
                     "controller_invoked": (feedback is not None
                                             and getattr(feedback, "adaptation_action",
                                                         None) is not None),
@@ -279,7 +290,7 @@ class BatchRunner:
                                                     slot.state.round_id, "target"),
                 })
                 slot.trajectory.append(step)
-                self.memory.update(step)
+                self.memory.update(step, slot.state)
                 if self.on_step is not None:
                     try:
                         self.on_step(step, slot)

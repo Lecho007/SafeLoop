@@ -16,6 +16,10 @@ user_template: |
 
   [CURRENT STRATEGY] {current_strategy}
 
+  [EXPERIENCE] (prior test observations on similar targets; round-0 is always empty;
+  observations are NOT success labels — you decide what to try)
+  {experience_block}
+
   [HISTORY]
   {history_block}
   [FEEDBACK]

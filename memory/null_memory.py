@@ -16,5 +16,5 @@ class NullMemory(BaseMemory):
     def retrieve(self, state: AttackState) -> Tuple[List[MemoryItem], List[MemoryItem]]:
         return [], []
 
-    def update(self, step: AttackStep) -> None:
+    def update(self, step: AttackStep, state: AttackState = None) -> None:
         return None

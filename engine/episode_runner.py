@@ -107,7 +107,7 @@ class EpisodeRunner:
                 online_success=bool((judge_output.jailbreak_score or 0.0) >= 0.5),
             )
             trajectory.append(step)
-            self.memory.update(step)
+            self.memory.update(step, state)
 
             logger.info(
                 "[%s/%s] round=%d strategy=%s outcome=%s online_success=%s reward=%.3f",

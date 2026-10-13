@@ -538,6 +538,10 @@ def build_parser() -> argparse.ArgumentParser:
                     choices=["openai_chat", "anthropic", "openai_responses"])
     ap.add_argument("--api-key-env", default="TARGET_API_KEY",
                     help="API key 所在环境变量名（key 不进命令行）")
+    ap.add_argument("--use-memory", action="store_true",
+                    help="v1.1 实验能力：长期攻击记忆（round 1+ 生效，跨 run 积累）")
+    ap.add_argument("--adaptive-budget", type=int, default=None, metavar="Q",
+                    help="v1.1 实验能力：自适应评估模式的总目标查询预算（如 300）")
     sub = ap.add_subparsers(dest="cmd")
     rp = sub.add_parser("report", help="终端重新渲染已保存的报告 JSON")
     rp.add_argument("path", help="outputs/reports/ 下的报告文件")
@@ -599,6 +603,8 @@ def run_flow(console: "Console", args) -> int:
         question=question,
         target_model=api_cfg["model"] if api_cfg else "phi-3.5-mini",
         api_target=api_cfg,
+        use_memory=bool(getattr(args, "use_memory", False)),
+        adaptive_budget=getattr(args, "adaptive_budget", None),
         config_path=args.config or "configs/hardware/rtx4060_8g_1br.yaml")
     run_id = mgr.submit(spec)
     n_effective = 1 if scope == "single" else (n_tasks if scope == "sample" else 100)
