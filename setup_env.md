@@ -304,3 +304,63 @@ judge:
 evaluator:
   backend: strongreject_ft  # LoRA + base_model_path（gemma-2b 底座）
 ```
+
+## 工程收尾：统一入口 / Docker / 冒烟测试（2026-10-13）
+
+### 统一命令入口 `safeloop`
+
+```bash
+# 安装（safeLoop 环境，一次性；--no-build-isolation 避免隔离环境联网拉 setuptools）
+$PY -m pip install -e . --no-build-isolation
+# 之后所有入口统一为 safeloop（等价 python -m apps.cli）：
+safeloop serve --port 8712                 # Web 工作台（SPA+API 单进程，推荐入口）
+safeloop workbench                         # 终端向导工作台（参数透传）
+safeloop evaluate|compare|report|api-eval  # 纯 JSON 输出（脚本友好）
+safeloop test-connection --base-url ... --model ...
+safeloop review run_xxx [--off]            # 高风险人工复核标记（与网页 GUI 同一存储）
+safeloop cleanup --days 30                 # 清理旧的排队/取消/失败 run 记录（保留完成 run 与产物）
+```
+
+不安装包时旧方式仍全部可用：`PYTHONPATH=. $PY -m uvicorn apps.api.server:app`、
+`PYTHONPATH=. $PY apps/cli/workbench_cli.py ...`。
+
+### Docker（轻量服务版，零 GPU）
+
+镜像含 Web 工作台 + API + 演示回放数据；适合演示、报告查看、历史管理与黑盒 API
+目标接入的界面操作。本地模型评估（红方/裁判/评审加载权重）仍需源码方式部署。
+
+```bash
+docker compose up -d                     # 构建并启动 → http://127.0.0.1:8712
+docker compose down                      # 停止（outputs 数据在 named volume 里保留）
+# 可选鉴权：export SAFELOOP_API_KEY=... 后 up；网页页头钥匙按钮填同一密钥
+```
+
+- 数据持久化：named volume `safeloop_outputs`（首次启动自动继承镜像内演示数据）；
+- 镜像内已排除 weights/源码开发件（见 .dockerignore），体积以 python:3.10-slim 为基。
+
+### 前端冒烟测试（Playwright，零 GPU）
+
+覆盖：首页渲染/架构图/历史 → 载入示例数据 → 报告页（徽章卡/导出按钮）→
+回放页（全量列表/全文弹窗）→ 指定场景类别加载。改前端后必跑。
+
+```bash
+# 前置①：Web 服务已启动（safeloop serve 或 uvicorn 方式）
+# 前置②（Windows 开发机，一次性）：在任意本地盘目录装 playwright（不要装进项目，
+#   避免替换 WSL 侧 node_modules 的平台二进制）：
+#     mkdir D:\ZcodeData\safeloop-smoke && cd /d D:\ZcodeData\safeloop-smoke
+#     npm init -y && npm i playwright
+# 运行（优先复用系统 Edge，无需下载 Chromium）：
+cd apps/web
+PLAYWRIGHT_PKG=D:/ZcodeData/safeloop-smoke/package.json npm run smoke
+# Git Bash 下 npm run 不支持 UNC 路径时，直接：
+#   PLAYWRIGHT_PKG=... node apps/web/tests/smoke.mjs
+# 失败自动截图 tests/smoke-error.png；退出码非零可用于 CI。
+```
+
+### 本轮其余新增（网页 GUI）
+
+- 高级选项（长期记忆/智能预算）Web 端真正生效（FastAPI 请求模型补字段透传）；
+- 智能预算运行态可视化：预算进度条 + 终端「经验」标记 + 报告页智能预算摘要卡；
+- API 目标配置持久化：测试连接通过后自动记住（本机浏览器 localStorage，
+  最多 6 条，只存协议/地址/模型名/密钥变量名）；
+- 运行库状态域修复：agent 中间态（READY/PLANNING 等）不再泄漏进 runs.status。

@@ -101,6 +101,18 @@
 3. 调度不以 ASR 为唯一目标——覆盖、有效发现、成本、可信度同权重。
 4. 模型凭据只经环境变量，永不落盘（请求/日志/provenance/记忆库）。
 
+## 工程收尾（2026-10-13，产品定位执行：A4 消融与 CN 人工审核豁免）
+
+- [x] GUI 完善轮：契约修复（v1.1 字段透传/X-API-Key）+ 预置 bug（回放页嵌套
+      访问必崩等）+ 功能补全（导出/存档下载/人工复核/全量回放筛选/全文弹窗）
+      + 视觉 14 轮迭代（徽章卡/sticky/KPI 动效/架构图对称与玻璃同材质）。
+- [x] A5 补全：智能预算运行态进度条 + 终端「经验」标记 + 报告智能预算摘要卡；
+      API 目标配置持久化（localStorage 预设，P4"保存非敏感配置"闭环）。
+- [x] 运行库维护：prune_runs 清理 + agent 中间态泄漏进 runs.status 修复。
+- [x] 统一入口 `safeloop`（serve/workbench/cleanup/review/…，pip install -e .）。
+- [x] Docker 轻量服务版（compose + named volume 持久化 + 可选 API key）。
+- [x] 前端 Playwright 冒烟（系统 Edge 零下载，11 断言，失败自动截图）。
+
 ## 相对原始两份计划的修正记录（已采纳）
 
 显示 bug 提前 W0；产品路径 checkpoint 前置；RunManager 模块级统一（CLI 不依赖

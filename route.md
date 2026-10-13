@@ -481,6 +481,49 @@ per-task cap、决策留痕）经 BatchRunner round_selector 挂钩接入（默�
 
 提交：96d6c3b 之后（本轮）。
 
+### 4.26 GUI 完善轮 + 工程收尾（2026-10-13，8f98683…本轮多提交）
+
+**GUI 完善轮（用户批准计划：修复+功能补全+视觉升级）**：
+- 契约修复：EvalRequest 补 use_memory/adaptive_budget 透传（此前 Web 高级选项
+  被 pydantic 静默丢弃、完全无效）；vite 代理 +/suite；前端 X-API-Key 配套
+  （页头钥匙按钮，密钥只存浏览器）；
+- E2E 抓出并修复两个预置 bug：ReplayView 对扁平 /trajectories 数据用嵌套
+  t.task.* 访问（查看任何真实 run 回放页必空白）与 demo 裁决卡未定义
+  demoVerdict；另修 set_reviewed 取消复核不删旧标记、RiskFindings 中档误红、
+  .sl-pill 无样式、计时器冻结、刷新丢运行（sessionStorage 恢复）、轮询静默、
+  连接测试不失效、autoplay 重入等十余项；
+- 新功能：报告页操作区（导出打印就绪 HTML / 下载对话存档 / 高风险人工复核
+  标记，roadmap P3 零调用函数接通）；回放页全量轨迹 + 全部/仅风险/仅抵御筛选；
+  截断对话「全文」弹窗；live tail=200 防长跑截断；导入 run 可查看；FAILED
+  原因悬停展示；
+- 视觉（14 轮迭代至用户满意）：报告等级徽章卡（语义色辉光）、sticky 玻璃页头、
+  KPI 数字滚动、终端信号点图例+空态光标+新轮淡入、历史行 hover、focus-visible；
+  架构图历经白盒→渐变→芯片→简约流程图→回归原版树状布局多轮，最终形态=
+  原版层次布局+图容器与玻璃卡同材质（58% 白+blur/saturate 同参数）+节点无白底
+  彩描边+连线几何精确（程序化断言：0 穿透/0 交叉/端点贴合≤4px）+全图严格
+  关于中轴镜像对称（DOM 镜像断言全过）+节点文字两行同中心居中（getBBox
+  ≤0.5px）；
+- 测试：+5（test_api_server：透传/export/transcript/reviewed/live-tail，
+  直接调路由函数无 httpx 依赖），193 全绿。
+
+**工程收尾（用户批准：A4 消融与 CN 人工审核按产品定位豁免）**：
+- A5 调度可视化补全：live 事件加 memory_used（终端「经验」标记）、运行区
+  智能预算进度条（从 spec 同步，续跑/恢复也对）、报告页智能预算摘要卡
+  （D(Q)/Yield/欠测任务数）；API 目标配置持久化（localStorage 预设，测试
+  连接通过自动保存，P4"保存非敏感配置"项闭环）；
+- 运行库：prune_runs(days) 清理旧非完成 run（保留产物文件）；修复 agent
+  中间态（READY/PLANNING/REPORTING）泄漏进 runs.status 的时序 bug
+  （_AGENT_TO_RUN_STATUS 映射收窄，test_serial_queue 竞态显形后修复）；
+- 统一入口：pyproject.toml + `safeloop` 命令（serve/workbench/cleanup/review
+  与原 evaluate/compare/report/api-eval/test-connection 合流），
+  `python -m apps.cli` 等价；pip install -e . --no-build-isolation 安装；
+- Docker 轻量服务版：python:3.10-slim 单镜像（SPA+API+演示回放数据，
+  .dockerignore 排除权重/开发件），docker-compose（named volume
+  safeloop_outputs 持久化，可选 SAFELOOP_API_KEY）；
+- 前端冒烟：apps/web/tests/smoke.mjs（Playwright，优先系统 Edge 零下载，
+  11 断言：首页/架构图/历史/示例数据/报告徽章+按钮/回放计数+全文弹窗/
+  指定场景类别），失败自动截图，193 python 测试 + 冒烟全绿。
+
 ## 5. 目录结构（模块直接位于 SafeLoop 主目录）
 
 ```
