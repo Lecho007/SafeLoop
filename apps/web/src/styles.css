@@ -227,6 +227,7 @@ body::after {
 .el-tabs__item.is-active { color: var(--blue); }
 .el-collapse { border: none; background: transparent; }
 .el-collapse-item__header { background: transparent; font-weight: 600; }
+.el-collapse-item__wrap { background: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
   .term-head .dot, .bar, .cursor, .t-round, .t-q, .t-a { animation: none !important; }
