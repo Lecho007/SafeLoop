@@ -193,9 +193,41 @@ h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
 .stTabs>div>div>button{color:var(--muted);font-weight:600;padding:8px 18px;}
 .stTabs>div>div>button[aria-selected="true"]{color:var(--blue);}
 .stTabs [data-baseweb="tab-highlight"]{background:var(--blue);}
-.stButton>button{border-radius:11px;border:1px solid var(--line);}
-.stButton>button[kind="primary"]{box-shadow:0 8px 20px rgba(47,111,235,.30);}
 .stProgress>div>div>div{background:linear-gradient(90deg,#2f6feb,#7556d8)!important;}
+/* 单选 → 预览稿 chip 胶囊（横排、选中绿胶囊） */
+[data-testid="stRadio"]{display:flex!important;flex-direction:row!important;
+  flex-wrap:wrap;gap:8px!important;align-items:center;}
+[data-testid="stRadio"] > label{display:inline-flex!important;align-items:center;
+  border:1px solid var(--line)!important;border-radius:999px!important;
+  padding:7px 16px!important;margin:0!important;
+  background:rgba(255,255,255,.65)!important;color:var(--muted)!important;
+  cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;}
+[data-testid="stRadio"] > label:hover{border-color:#b5cdf4!important;}
+[data-testid="stRadio"] > label > div:first-child{display:none!important;}
+[data-testid="stRadio"] > label > p{font-size:13.5px!important;
+  color:inherit!important;font-weight:600!important;padding:0!important;
+  margin:0!important;}
+[data-testid="stRadio"] > label:has(input:checked){
+  border-color:#bde4d3!important;background:#effaf5!important;
+  color:#147451!important;box-shadow:0 2px 10px rgba(22,135,93,.14);}
+/* 按钮 → 预览稿渐变主按钮 / 幽灵次按钮 */
+[data-testid="stBaseButton-primary"]{
+  background:linear-gradient(135deg,#2f6feb,#4f7cf0)!important;color:#fff!important;
+  border:none!important;border-radius:12px!important;
+  box-shadow:0 8px 20px rgba(47,111,235,.35)!important;
+  font-weight:600!important;transition:transform .15s,box-shadow .15s;}
+[data-testid="stBaseButton-primary"]:hover{transform:translateY(-1px);
+  box-shadow:0 12px 26px rgba(47,111,235,.42)!important;}
+[data-testid="stBaseButton-secondary"]{
+  background:rgba(255,255,255,.72)!important;color:var(--muted)!important;
+  border:1px solid var(--line)!important;border-radius:12px!important;}
+[data-testid="stBaseButton-secondary"]:hover{border-color:#b5cdf4!important;
+  color:var(--txt)!important;}
+/* 滑杆 → 预览稿细轨道 + 白底蓝圈手柄 */
+[data-baseweb="thumb"]{width:16px!important;height:16px!important;
+  background:#fff!important;border:2px solid var(--blue)!important;
+  box-shadow:0 2px 6px rgba(47,111,235,.30)!important;}
+[data-baseweb="track"]{height:6px!important;}
 [data-testid="stExpander"]{background:var(--glass);
   backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px);
   border:1px solid var(--glass-line);border-radius:16px;overflow:hidden;}
@@ -285,7 +317,12 @@ def _empty(ic, title, hint):
 _t, _e = st.columns([8, 1])
 with _t:
     st.markdown(
-        "<div style='display:flex;align-items:center;gap:14px'>"
+        "<div style='display:flex;align-items:center;gap:14px;"
+        "background:rgba(255,255,255,.58);backdrop-filter:blur(20px) saturate(1.5);"
+        "-webkit-backdrop-filter:blur(20px) saturate(1.5);"
+        "border:1px solid rgba(255,255,255,.72);border-radius:16px;"
+        "padding:14px 20px;box-shadow:0 8px 32px rgba(23,32,51,.08),"
+        "inset 0 1px 0 rgba(255,255,255,.85)'>"
         "<div style='width:42px;height:42px;border-radius:12px;display:grid;"
         "place-items:center;background:linear-gradient(135deg,#2f6feb,#7556d8);"
         "color:#fff;flex:none;box-shadow:0 6px 18px rgba(47,111,235,.35)'>{}</div>"
