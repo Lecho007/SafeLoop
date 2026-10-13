@@ -22,3 +22,6 @@ apps/web/node_modules/
 # Python 打包产物（pip install -e .；注意 apps/web/dist 是前端产物需入库，排除规则见下）
 *.egg-info/
 build/
+
+# ZCode 会话产物
+.zcode/
