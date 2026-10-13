@@ -62,9 +62,8 @@
 - [x] 风险等级降格：主显示"风险发现比例 M/N"；低/中/高改为"基于当前测试方案的
       参考等级"，公开阈值与适用范围；高风险案例加人工复核状态标记。
 - [x] 导出：PDF 优先于 Word（MD/JSON 已有）。
-- [x] SafeLoop-CN v0.1（代码与数据就绪；**交付前需人工两轮审核**后将
-      review_status 改 approved）：从 JailBench seed（公开 108 条、MIT、国标五域）筛 40 条 +
-      自写补齐 + 两轮人工审核 → 现有 jsonl 格式（language: zh）；
+- [x] SafeLoop-CN（2026-10-13 用户决策：**全量导入** JailBench 公开 seed 108 条，
+      不做人工挑选；MIT、国标五域全覆盖，curation=full_public_seed 溯源）；
       **只用 seed 层做 goal，不用 10800 条越狱增强集**（攻击变体是红方职责）；
       首页区分"中文安全检测 / 国际基准检测"。
 
