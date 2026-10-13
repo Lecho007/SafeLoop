@@ -88,7 +88,7 @@ usage: app.provide(ZINDEX_INJECTION_KEY, { current: 0 })`),{initialZIndex:a,curr
 .hd-core{fill:rgba(47,111,235,.10);stroke:#2f6feb;stroke-width:1.8}
 .hd-t{font-size:14.5px;font-weight:600;fill:#172033}
 .hd-s{font-size:10.5px;fill:#67738a}
-/* 连线：端点精确贴节点边缘（几何校验过，无穿透），统一小箭头 */
+/* 连线：端点精确贴节点边缘，左右严格镜像（对称轴 x=430） */
 .hd-e{fill:none;stroke:#c9d6e6;stroke-width:1.8}
 .hd-flow{fill:none;stroke:#2f6feb;stroke-width:2.6;stroke-linecap:round;
   stroke-dasharray:6 16;opacity:0;
@@ -112,52 +112,49 @@ usage: app.provide(ZINDEX_INJECTION_KEY, { current: 0 })`),{initialZIndex:a,curr
     </marker>
   </defs>
 
-  <!-- ===== 连线（端点=节点边缘±2px，几何核验无穿透/无交叉） ===== -->
+  <!-- ===== 连线（关于 x=430 镜像对称；端点=节点边缘±2px） ===== -->
   <!-- A 用户→主智能体 -->
   <path class="hd-e" d="M430 54 V 96" marker-end="url(#hdA)"/>
-  <!-- B/C/D 主智能体→红方/判别/评审（扇形三叉） -->
-  <path class="hd-e" d="M430 152 L 190 198" marker-end="url(#hdA)"/>
+  <!-- B/C/D 主智能体→红方/判别/评审（扇形三叉，B 与 D 互为镜像） -->
+  <path class="hd-e" d="M430 152 L 180 198" marker-end="url(#hdA)"/>
   <path class="hd-e" d="M430 152 V 198" marker-end="url(#hdA)"/>
   <path class="hd-e" d="M430 152 L 680 198" marker-end="url(#hdA)"/>
-  <!-- E 红方→被测（折线：垂直下再斜入被测顶边） -->
-  <path class="hd-e" d="M190 256 V 284 L 352 306" marker-end="url(#hdA)"/>
-  <!-- F 被测→判别（回答上行给判别分析） -->
+  <!-- E 红方→被测 / G 被测→评审（两条直线互为镜像；被测顶边三接点 368/430/492 均匀分布） -->
+  <path class="hd-e" d="M180 256 L 368 306" marker-end="url(#hdA)"/>
   <path class="hd-e" d="M430 306 V 256" marker-end="url(#hdA)"/>
-  <!-- G 被测→独立评审（完整轨迹出闭环） -->
-  <path class="hd-e" d="M532 334 H 606 L 652 256" marker-end="url(#hdA)"/>
+  <path class="hd-e" d="M492 306 L 680 256" marker-end="url(#hdA)"/>
 
   <!-- 光流接力（与连线同形） -->
   <path class="hd-flow" style="animation-delay:0s,0s"    d="M430 54 V 96"/>
-  <path class="hd-flow" style="animation-delay:0s,.5s"   d="M430 152 L 190 198"/>
+  <path class="hd-flow" style="animation-delay:0s,.5s"   d="M430 152 L 180 198"/>
   <path class="hd-flow" style="animation-delay:0s,.5s"   d="M430 152 V 198"/>
   <path class="hd-flow" style="animation-delay:0s,.5s"   d="M430 152 L 680 198"/>
-  <path class="hd-flow" style="animation-delay:0s,1.4s"  d="M190 256 V 284 L 352 306"/>
+  <path class="hd-flow" style="animation-delay:0s,1.4s"  d="M180 256 L 368 306"/>
   <path class="hd-flow" style="animation-delay:0s,2.0s"  d="M430 306 V 256"/>
-  <path class="hd-flow" style="animation-delay:0s,2.7s"  d="M532 334 H 606 L 652 256"/>
+  <path class="hd-flow" style="animation-delay:0s,2.7s"  d="M492 306 L 680 256"/>
 
   <!-- ===== 节点 ===== -->
   <g><circle cx="430" cy="36" r="16" fill="rgba(47,111,235,.10)"
      stroke="#2f6feb" stroke-width="1.6"/>
     <text x="430" y="41" text-anchor="middle" style="font-size:12px;font-weight:700" fill="#2f6feb">用户</text></g>
-  <text x="458" y="33" class="hd-t">用户</text>
   <rect class="hd-n hd-core" x="320" y="98" width="220" height="52" rx="10"/>
-  <circle cx="338" cy="112" r="11" fill="#2f6feb"/><text x="338" y="116" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">核</text><text x="444" y="120" text-anchor="middle" class="hd-t">SafeLoop 主智能体</text>
-  <text x="444" y="138" text-anchor="middle" class="hd-s">需求理解，规划与调度</text>
-  <rect class="hd-n" x="110" y="202" width="160" height="52" rx="9" style="stroke:#e6465f"/>
-  <rect x="122" y="212" width="22" height="22" rx="5" fill="#e6465f"/><text x="133" y="227" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">红</text><text x="207" y="224" text-anchor="middle" class="hd-t">红方测试员</text>
-  <text x="207" y="242" text-anchor="middle" class="hd-s">设计并逐轮调整测试问题</text>
+  <circle cx="341" cy="112" r="11" fill="#2f6feb"/><text x="341" y="116" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">核</text><text x="446" y="120" text-anchor="middle" class="hd-t">SafeLoop 主智能体</text>
+  <text x="446" y="138" text-anchor="middle" class="hd-s">需求理解，规划与调度</text>
+  <rect class="hd-n" x="90" y="202" width="180" height="52" rx="9" style="stroke:#e6465f"/>
+  <rect x="102" y="212" width="22" height="22" rx="5" fill="#e6465f"/><text x="113" y="227" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">红</text><text x="197" y="224" text-anchor="middle" class="hd-t">红方测试员</text>
+  <text x="197" y="242" text-anchor="middle" class="hd-s">设计并逐轮调整测试问题</text>
   <rect class="hd-n" x="340" y="202" width="180" height="52" rx="9" style="stroke:#2f6feb"/>
-  <path d="M352 214 l7 -4 7 4 v8 l-7 4 -7 -4 z" fill="#2f6feb" opacity=".9"/><text x="443" y="224" text-anchor="middle" class="hd-t">安全判别智能体</text>
-  <text x="443" y="242" text-anchor="middle" class="hd-s">内容安全与目标推进双视角</text>
+  <path d="M356 214 l7 -4 7 4 v8 l-7 4 -7 -4 z" fill="#2f6feb" opacity=".9"/><text x="445" y="224" text-anchor="middle" class="hd-t">安全判别智能体</text>
+  <text x="445" y="242" text-anchor="middle" class="hd-s">内容安全与目标推进双视角</text>
   <rect class="hd-n" x="590" y="202" width="180" height="52" rx="9" style="stroke:#16875d"/>
-  <path d="M602 214 v14 M594 214 h16 M602 214 l-7 9 h14 z" stroke="#16875d" stroke-width="2" fill="none"/><text x="690" y="224" text-anchor="middle" class="hd-t">独立评审官</text>
-  <text x="690" y="242" text-anchor="middle" class="hd-s">不参与测试，只做最终裁决</text>
+  <path d="M613 214 v14 M605 214 h16 M613 214 l-7 9 h14 z" stroke="#16875d" stroke-width="2" fill="none"/><text x="696" y="224" text-anchor="middle" class="hd-t">独立评审官</text>
+  <text x="696" y="242" text-anchor="middle" class="hd-s">不参与测试，只做最终裁决</text>
   <rect class="hd-n" x="330" y="308" width="200" height="52" rx="9" style="stroke:#7556d8"/>
   <rect x="342" y="316" width="22" height="16" rx="3" fill="#7556d8"/><text x="353" y="328" text-anchor="middle" style="font-size:10px;font-weight:700" fill="#fff">T</text><text x="447" y="330" text-anchor="middle" class="hd-t">被测大模型</text>
   <text x="447" y="348" text-anchor="middle" class="hd-s">本地模型或在线API黑盒</text>
-  <rect x="110" y="386" width="660" height="30" rx="6" fill="rgba(255,255,255,.30)"
+  <rect x="90" y="386" width="680" height="30" rx="6" fill="rgba(255,255,255,.30)"
         stroke="#c9d6e6" stroke-dasharray="4 3"/>
-  <text x="440" y="405" text-anchor="middle" class="hd-s">
+  <text x="430" y="405" text-anchor="middle" class="hd-s">
     Skills 能力层：任务解析，智能路由，反馈生成，策略控制，模型调用，过程记录，指标统计，报告生成</text>
 </svg>
 <div style="text-align:center;color:#67738a;font-size:12.5px;padding:4px 0 12px">
