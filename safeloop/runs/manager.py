@@ -268,13 +268,13 @@ class RunManager:
                 " ORDER BY created_at LIMIT 1").fetchone()
             if row is None:
                 return None
-            # 抢占式置 RUNNING（单工作进程，无竞态）
-            self._db.execute(
+            # 抢占式置 RUNNING；检查影响行数防多实例（同进程多 session）双取
+            cur = self._db.execute(
                 "UPDATE runs SET status='RUNNING',started_at=?,updated_at=?"
                 " WHERE run_id=? AND status='QUEUED'", (_now(), _now(),
                                                         row["run_id"]))
             self._db.commit()
-            return row["run_id"]
+            return row["run_id"] if cur.rowcount else None
 
     def _execute(self, run_id: str) -> None:
         with self._lock:
