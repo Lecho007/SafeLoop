@@ -83,7 +83,7 @@
             </div>
             <div style="flex:1.6">
               <div class="lbl">场景</div>
-              <el-select v-model="wizard.scenario" size="default" filterable>
+              <el-select v-model="wizard.scenario" size="default">
                 <el-option v-for="it in categoryItems" :key="it.task_id"
                   :label="it.task_id + ' ｜ ' + it.goal.slice(0, 30)" :value="it.task_id" />
               </el-select>

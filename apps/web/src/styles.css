@@ -210,7 +210,12 @@ body::after {
 .el-select__wrapper.is-hovering { box-shadow: 0 0 0 1px #9fb3d1 inset; }
 .el-select__wrapper.is-focused, .el-input__wrapper.is-focus {
   box-shadow: 0 0 0 1px var(--blue) inset; }
-.el-select__input { background: transparent; border: none; }
+/* Element Plus 在 select 内部渲染的辅助 input(键盘可达性)压成零尺寸：
+   任何状态下都不可见、不占位——用户看到的"下拉框里嵌套输入框"即它聚焦显形 */
+.el-select__input { width: 0 !important; min-width: 0 !important; max-width: 0 !important;
+  padding: 0 !important; border: none !important; background: transparent !important;
+  caret-color: transparent !important; flex: none !important; }
+.el-select__input-wrapper { min-width: 0 !important; }
 /* 选中文字超长省略（长任务名不再撑破/溢出下拉框） */
 .el-select__placeholder span { display: block; max-width: 100%; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis; }
