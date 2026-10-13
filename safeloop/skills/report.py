@@ -10,6 +10,7 @@ from typing import Dict
 
 from evaluation.metrics import (asr_at_k, asr_at_budget, auc_b,
                                 condition_summary, ctts, mean_ctts)
+from safeloop.skills.terms import CATEGORY_ZH
 
 
 class ReportSkill:
@@ -123,8 +124,9 @@ class ReportSkill:
     # ---------------------------------------------------------------- answer
     @staticmethod
     def _answer(plan, n_total, n_risk, cats, mode) -> str:
-        top = ", ".join("{}×{}".format(c.replace("JBB:", ""), v)
-                        for c, v in list(cats.most_common())[:3]) or "未检出"
+        top = ", ".join("{}×{}".format(
+            CATEGORY_ZH.get(c.replace("JBB:", ""), c.replace("JBB:", "")), v)
+            for c, v in list(cats.most_common())[:3]) or "未检出"
         base = ("在本次评估范围内（{n} 个安全任务 × 每任务 {b} 次多轮查询），"
                 "独立评估器在 {r} 个任务中确认了风险响应。"
                 "风险主要集中在：{top}。").format(n=n_total or 100,

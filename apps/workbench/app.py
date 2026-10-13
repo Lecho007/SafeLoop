@@ -89,18 +89,19 @@ html,body,.stApp{background:var(--bg)!important;color:var(--txt)!important;}
 div[data-testid="block-container"]{max-width:1100px!important;
   margin:0 auto!important;padding:6rem 2rem 3rem!important;}
 /* 左右玻璃卡等高（短卡不留下方空白） */
-.stHorizontalBlock{align-items:stretch!important;}
+.stHorizontalBlock, div[data-testid*="stHorizontalBlock"],
+div[class*="stHorizontalBlock"]{align-items:stretch!important;}
 .stHorizontalBlock>div{height:100%;}
-[data-testid="stVerticalBlockBorderWrapper"]{height:100%;}
 h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
 .sl-sub{color:var(--muted);font-size:14px;margin:2px 0 0;}
 .sl-meta{color:var(--muted);font-size:13px;}
-/* ---------- 玻璃卡（st.container(border=True) 的皮）---------- */
-[data-testid="stVerticalBlockBorderWrapper"]{
-  background:var(--glass)!important;
-  backdrop-filter:blur(20px) saturate(1.5);
-  -webkit-backdrop-filter:blur(20px) saturate(1.5);
-  border:1px solid var(--glass-line)!important;border-radius:16px!important;
+/* ---------- 玻璃卡（模糊匹配各版本 Streamlit 边框容器命名，防选择器失效）---------- */
+div[data-testid*="BorderWrapper"], div[class*="BorderWrapper"],
+div[data-testid*="BorderContainer"], div[class*="BorderContainer"]{
+  background:rgba(255,255,255,.58)!important;
+  backdrop-filter:blur(20px) saturate(1.5)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.5)!important;
+  border:1px solid rgba(255,255,255,.72)!important;border-radius:16px!important;
   box-shadow:0 8px 32px rgba(23,32,51,.08),inset 0 1px 0 rgba(255,255,255,.85)!important;
   padding:6px 10px!important;}
 /* ---------- 通用组件 ---------- */
@@ -228,9 +229,13 @@ h1,h2,h3,h4{color:var(--txt);font-weight:700;letter-spacing:.4px;}
   background:#fff!important;border:2px solid var(--blue)!important;
   box-shadow:0 2px 6px rgba(47,111,235,.30)!important;}
 [data-baseweb="track"]{height:6px!important;}
-[data-testid="stExpander"]{background:var(--glass);
-  backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px);
-  border:1px solid var(--glass-line);border-radius:16px;overflow:hidden;}
+[data-testid="stExpander"], div[data-testid*="stExpander"],
+div[class*="stExpander"]{
+  background:rgba(255,255,255,.58)!important;
+  backdrop-filter:blur(20px) saturate(1.5)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.5)!important;
+  border:1px solid rgba(255,255,255,.72)!important;border-radius:16px!important;
+  overflow:hidden;}
 @media (prefers-reduced-motion:reduce){
   .term-head .dot{animation:none!important}
   .sl-bar{animation:none!important}
@@ -889,15 +894,19 @@ with tab0:
 
 # ============================================================ Tab 轨迹回放
 with tab2:
-    demo_tag = ("　<span class='sl-pill'>演示数据</span>"
-                if agent is not None and getattr(agent, "is_demo", False) else "")
+    demo_view = agent is None or getattr(agent, "is_demo", False)
+    demo_tag = "　<span class='sl-pill'>演示数据</span>" if demo_view else ""
     st.markdown("<div class='sl-sec'>{}　证据链回放{}</div>".format(
         icon("doc", 16), demo_tag), unsafe_allow_html=True)
-    if not pool:
+    if demo_view:
+        pool = [DEMO]
+        traj = DEMO
+    elif not pool:
         st.markdown(_empty("doc", "暂无轨迹数据",
                            "完成一次检测（或载入示例数据）后，<br>"
                            "这里逐轮展示红方提问、模型回答与最终裁决。"),
                     unsafe_allow_html=True)
+        traj = None
     else:
         risky = [t for t in pool if any(_ok(s) for s in t.steps)]
         safe = [t for t in pool if not any(_ok(s) for s in t.steps)]
@@ -905,6 +914,7 @@ with tab2:
         labels = [scenario_label(t, expert) for t in show]
         sel = st.selectbox("选择场景", labels)
         traj = show[labels.index(sel)]
+    if traj is not None:
         st.markdown("<div class='sl-card'><b>测试目标（全程固定不变）</b><br>{}</div>"
                     .format(traj.task.goal), unsafe_allow_html=True)
         blocks = []
@@ -966,11 +976,21 @@ with tab5:
         s5 = asr_at_budget(comp.get("standard") or {}, _b)
         g5 = asr_at_budget(comp.get("guided") or {}, _b)
         verdict = compare_verdict(s5, g5, ov["total_tasks"] or 100)
+        # 人话结论（替代引擎英文 answer）：类别一律中文
+        _dist = sorted((report.get("risk_distribution") or {}).items(),
+                       key=lambda x: -x[1])
+        _zh = lambda k: CATEGORY_ZH.get(k.replace("JBB:", ""), k)
+        friendly = "在 {} 个测试场景中，独立评审确认 {} 个存在风险响应".format(
+            ov["total_tasks"], ov["risk_tasks"])
+        if _dist:
+            friendly += "；主要集中在：" + "、".join(
+                "{} ×{}".format(_zh(k), v) for k, v in _dist[:3])
+        friendly += "。该结论仅适用于本次测试方案（任务集、轮数与评估器配置）。"
         st.markdown("<div class='sl-card'>"
                     "<div style='font-size:17px;font-weight:700;margin-bottom:6px'>"
                     "总体结论</div>"
                     "<div class='sl-answer'>{}</div>{}</div>".format(
-                        ov["answer"],
+                        friendly,
                         ("<div style='margin-top:10px;color:var(--warn)'>"
                          "对比检测：{}。<span class='sl-meta'>这也是我们的研究发现："
                          "安全判别信号「可观察」不等于「应该干预」。</span></div>"
@@ -980,7 +1000,8 @@ with tab5:
             for l in report.get("limitations", [])[:3]:
                 st.markdown("- " + l)
         if expert:
-            with st.expander("专家模式 · 研究指标"):
+            with st.expander("专家模式 · 研究指标与原始结论"):
+                st.caption(ov.get("answer", ""))
                 st.json(report["metrics"]["research_layer"])
                 if comp:
                     st.json({k: v for k, v in comp.items() if k != "note"})
