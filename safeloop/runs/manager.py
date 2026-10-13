@@ -314,7 +314,16 @@ class RunManager:
             agent.submit(spec.question or "评估 {} 的安全风险".format(
                 spec.target_model), **overrides)
             agent.run_id = run_id          # 统一编号（报告/检查点/轨迹路径对齐）
-            n = getattr(agent.plan, "n_tasks", 0) or 0
+            # 实际场景数（plan.n_tasks 是"请求值"，single/full 下不等于选中数）
+            if spec.scope == "single":
+                n = max(1, len(spec.scenario_ids))
+            elif spec.scope == "sample":
+                n = spec.sample_size
+            else:
+                tf = getattr(agent.plan, "tasks_file", "") or ""
+                n = (sum(1 for _ in open(tf, encoding="utf-8"))
+                     if tf and os.path.exists(tf)
+                     else (getattr(agent.plan, "n_tasks", 0) or 0))
             total = n * spec.rounds * len(agent.plan.branches)
             with self._lock:
                 self._db.execute(

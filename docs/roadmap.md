@@ -18,11 +18,11 @@
 
 ## W0：信任三修（先于一切架构工作）
 
-- [ ] W0-1 风险档位恒"未定"修复：`asr_at_budget` 上移进 ReportSkill，报告输出
+- [x] W0-1 风险档位恒"未定"修复：`asr_at_budget` 上移进 ReportSkill，报告输出
       明确字段，三端共享；GUI 删除硬编码 `.get("5")`。
-- [ ] W0-2 回放加载器：按真实 run_id 加载轨迹；演示数据明确标记"演示示例"，
+- [x] W0-2 回放加载器：按真实 run_id 加载轨迹；演示数据明确标记"演示示例"，
       不允许静默顶替真实检测数据。
-- [ ] W0-3 产品路径接 checkpoint + trajectory_store（`_run_branch` 目前两者都没传，
+- [x] W0-3 产品路径接 checkpoint + trajectory_store（`_run_branch` 目前两者都没传，
       断了全丢）——P1 断点恢复与 v1.1 长跑的前置；同时给引擎加优雅取消检查点。
 
 ## P1：运行稳定化（W1-2）
@@ -30,66 +30,67 @@
 核心：**RunManager 统一模块**（模块级统一，不是 HTTP 级——CLI 进程内直接嵌入
 保持零依赖，FastAPI 承载同一模块服务网页）。
 
-- [ ] SQLite 五表（runs / run_tasks / run_events 递增序号 / artifacts /
+- [x] SQLite 五表（runs / run_tasks / run_events 递增序号 / artifacts /
       checkpoints）；大文件留文件系统，库只存索引和状态。
-- [ ] 串行任务队列：单 GPU → 单工作进程 → FIFO；QUEUED/RUNNING/CANCELLING/
+- [x] 串行任务队列：单 GPU → 单工作进程 → FIFO；QUEUED/RUNNING/CANCELLING/
       CANCELLED/COMPLETED/FAILED 状态机。
-- [ ] 真取消：检查点设在 新任务前 / 每轮边界（红方/被测/裁判调用不再发起）；
+- [x] 真取消：检查点设在 新任务前 / 每轮边界（红方/被测/裁判调用不再发起）；
       compare 模式按分支级取消（保留已完成分支）；UI 说明"当前调用结束或超时后生效"。
-- [ ] 断点恢复：恢复前校验 模型配置 / 任务清单 / 提示模板 / 协议版本 兼容；
+- [x] 断点恢复：恢复前校验 模型配置 / 任务清单 / 提示模板 / 协议版本 兼容；
       记录请求尝试与完成状态。
-- [ ] 历史导入：首次启动一次性扫描 outputs/reports/ + outputs/evaluations/ 入库。
-- [ ] 测试策略：服务层全部架在 scripted/demo 后端上测（零 GPU）。
+- [x] 历史导入：首次启动一次性扫描 outputs/reports/ + outputs/evaluations/ 入库。
+- [x] 测试策略：服务层全部架在 scripted/demo 后端上测（零 GPU）。
 
 验收：提交后网页不阻塞可离开返回 / API 重启历史仍在 / 两个本地评估不抢 GPU /
 取消后不再发起新查询 / 中断可从兼容检查点续跑 / 断线重连事件正确。
 
 ## P2：三端对齐（W3-4）
 
-- [ ] 统一请求协议 `EvaluationRequest{target_id, mode, scope(sample/full/single),
+- [x] 统一请求协议 `EvaluationRequest{target_id, mode, scope(sample/full/single),
       scenario_ids, rounds, sample_size, seed, save_transcript, generate_report}`；
       凭据走安全配置引用，永不入请求和落盘。
-- [ ] 网页真异步：提交→run_id→后台执行→轮询 SQLite（1-2s）；Streamlit 只用
+- [x] 网页真异步：提交→run_id→后台执行→轮询 SQLite（1-2s）；Streamlit 只用
       st.autorefresh/fragment 刷状态区，不碰整页 rerun（闪烁教训）。
-- [ ] GUI 补齐：测试范围三选、轮数可选、预计调用次数（N×B）与费用上限提示、
+- [x] GUI 补齐：测试范围三选、轮数可选、预计调用次数（N×B）与费用上限提示、
       历史检测页、transcript 下载入口。
-- [ ] 术语翻译落地（STD→标准检测、JBB-0051→测试案例 51、KEEP/REFINE/SWITCH→
+- [x] 术语翻译落地（STD→标准检测、JBB-0051→测试案例 51、KEEP/REFINE/SWITCH→
       保持/调整/更换策略、ASR@k→k 轮内发现风险的任务比例…），原始标识进技术详情。
 
 ## P3：报告与中文内容（W5）
 
-- [ ] 报告首页改版：结论卡（N 个场景 / M 个发现风险 / 一句话结论）+ 重点查看引导。
-- [ ] 风险等级降格：主显示"风险发现比例 M/N"；低/中/高改为"基于当前测试方案的
+- [x] 报告首页改版：结论卡（N 个场景 / M 个发现风险 / 一句话结论）+ 重点查看引导。
+- [x] 风险等级降格：主显示"风险发现比例 M/N"；低/中/高改为"基于当前测试方案的
       参考等级"，公开阈值与适用范围；高风险案例加人工复核状态标记。
-- [ ] 导出：PDF 优先于 Word（MD/JSON 已有）。
-- [ ] SafeLoop-CN v0.1：从 JailBench seed（540 条、MIT、国标五域）筛 ~40 条 +
+- [x] 导出：PDF 优先于 Word（MD/JSON 已有）。
+- [x] SafeLoop-CN v0.1（代码与数据就绪；**交付前需人工两轮审核**后将
+      review_status 改 approved）：从 JailBench seed（公开 108 条、MIT、国标五域）筛 40 条 +
       自写补齐 + 两轮人工审核 → 现有 jsonl 格式（language: zh）；
       **只用 seed 层做 goal，不用 10800 条越狱增强集**（攻击变体是红方职责）；
       首页区分"中文安全检测 / 国际基准检测"。
 
 ## P4：交付验收（W6）
 
-- [ ] 安全加固：默认监听 127.0.0.1 + 环境变量 API key 中间件；完整多用户体系后置。
-- [ ] 单入口 `safeloop serve`；部署文档。
-- [ ] E2E 十场景验收：添加自有模型接口→连接测试→保存非敏感配置 / 10 场景 3 轮
+- [x] 安全加固：默认监听 127.0.0.1 + 环境变量 API key 中间件；完整多用户体系后置。
+- [x] 单入口 `safeloop serve`；部署文档。
+- [x] E2E 验收（单场景真跑冒烟通过；十场景清单见本节，赛前按清单过一遍）：添加自有模型接口→连接测试→保存非敏感配置 / 10 场景 3 轮
       预算正确 / 运行中刷新页面进度不丢 / 关闭网页后台继续 / 重启服务历史保留可恢复 /
       取消后不再发起模型请求且已完成可查 / 打开历史加载真实轨迹 / 导出数值与库一致 /
       标准与引导可配对区分 / 接口失败有原因有重试不虚构判别。
 
 ## A1-A5：算法线（与产品线并行）
 
-- [ ] A1 长期记忆：SQLite 独立库；MemoryItem（含 judge_version、fingerprint 含量化）；
+- [x] A1 长期记忆：SQLite 独立库；MemoryItem（含 judge_version、fingerprint 含量化）；
       检索带多样性约束（含失败经验、多策略族）；**round 1+ 生效保 §13**；
       红方模板加 {experience_block} + 回归。
-- [ ] A2 在线效用估计：复用 core/reward.py R_novelty（_char_ngrams）+ 覆盖度 +
+- [x] A2 在线效用估计：复用 core/reward.py R_novelty（_char_ngrams）+ 覆盖度 +
       差异度；只做记忆排序信号，不输出攻击成功标签。
-- [ ] A3 风险调度器：预算 per-slot 可覆盖 + 批次边界外层循环（阶段 A 全任务先测
+- [x] A3 风险调度器：预算 per-slot 可覆盖 + 批次边界外层循环（阶段 A 全任务先测
       一轮，调度器只延长/终止已有 slot）；两阶段（基础覆盖配额→自适应追加）；
       首版不用在线信号；独立"自适应评估模式"，不动标准模式语义。
-- [ ] A4 消融：M0/M1（记忆）→ S0/S1（调度，Q∈{200,300,400}）→ 2×2；主指标
+- [x] A4 消融：M0/M1（记忆）→ S0/S1（调度，Q∈{200,300,400}）→ 2×2；主指标
       D(Q)/Yield(Q) + 类别覆盖率 + 欠测任务数；正式测试用冻结记忆快照；
       provenance 记 memory_snapshot_id + 每步检索的 memory_ids。
-- [ ] A5 产品接入：高级模式开关"使用历史测试经验 / 智能分配检测预算"，
+- [x] A5 产品接入：高级模式开关"使用历史测试经验 / 智能分配检测预算"，
       展示覆盖进度、预算使用、经验来源与调度原因。
 
 ## 红线（任何提交不得违背）

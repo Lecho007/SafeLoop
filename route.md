@@ -428,6 +428,38 @@ finish_reason + CLI 空回答标记/警示。4096 实测：同一问题正文 22
 已知遗留：workbench GUI 取 ASR 用 `asr_at_k.get("5")`，B=3 预算下取不到、
 风险档位恒显"未定"；CLI 已改为取满预算轮，GUI 待修。
 
+### 4.24 产品化 W0-P4 + v1.1 算法线（2026-10-13，按 docs/roadmap.md 执行）
+
+**W0 信任三修**：asr_at_budget 统一读取口径（metrics 层纯函数 + ReportSkill 显式
+字段，GUI 删硬编码 .get("5")）；replay_loader 支持任意真实 run_id（演示数据
+is_demo 标记）；产品路径接 checkpoint+trajectory_store（原来断了全丢）+ 引擎
+轮边界优雅取消（CANCELLING→CANCELLED，分支级，部分结果照常出报告）。
+
+**P1 RunManager（safeloop/runs/manager.py）**：SQLite 五表（runs/run_tasks/
+run_events 递增序号/artifacts/checkpoints）+ 单 GPU 串行队列 + 真取消 + 检查点
+恢复 + 一次性历史导入；模块级统一——CLI 进程内嵌入、FastAPI 承载同一模块
+（+/runs /resume、SSE Last-Event-ID 断线续传、可选 SAFELOOP_API_KEY）。
+
+**P2 GUI 真异步 + 三端对齐**：RunSpec 统一请求协议；GUI st.fragment 2s 局部
+刷新（不整页 rerun）；测试范围（快速/完整/指定场景）+ 轮数 + 预算估算 +
+运行历史页（查看/停止/续跑）；演示数据明确标记；死代码清除。
+
+**P3 内容与导出**：suite 通路（jbb100/safeloop_cn/路径）；SafeLoop-CN v0.1
+（JailBench 公开 seed 策展 40 条、国标五域、pending_review、MIT；只用 seed 层
+做 goal，不用越狱增强集——攻击变体是红方职责）；打印就绪 HTML 导出
+（浏览器 Ctrl+P 存 PDF，transcript 全文嵌入）；风险等级降格为"参考等级"。
+
+**v1.1 A1-A4**：长期攻击记忆（SQLite 独立库、目标 fingerprint 命名空间、多样
+性检索含失败经验、冻结快照防泄漏、dedup 合并；outcome_proxy 只是过程观察，
+**永不**等于成功标签——红线 1）；在线效用估计（复用 R_novelty 三元字符核）；
+红方模板 {experience_block}（**round 0 硬门控为空**，保 §13 p0 不变量）；
+AdaptiveScheduler 两阶段（基础覆盖→自适应追加，覆盖缺口优先、在线信号只破平、
+per-task cap、决策留痕）经 BatchRunner round_selector 挂钩接入（默认 None，
+研究栈零影响）；routing 增加 memory_used；报告 adaptive 块输出 D(Q)/Yield；
+消融 harness（warmup→快照冻结→M0/M1、S0/S1、A0-A3，--dry-run 零 GPU 冒烟）。
+
+测试 194 项全绿；新提交：2949995 / ade75fd / d05287a / 34ad275 / 702d0d6。
+
 ## 5. 目录结构（模块直接位于 SafeLoop 主目录）
 
 ```

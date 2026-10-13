@@ -191,36 +191,53 @@ PYTHONPATH=. $PY -m streamlit run apps/workbench/app.py --server.port 8510
 # 浏览器打开 http://localhost:8510 —— 默认回放 1B-R 预跑数据（秒级）；
 # 也可选"现场真跑（小子集）"。
 
-# API（FastAPI + SSE）
-PYTHONPATH=. $PY -m uvicorn apps.api.server:app --port 8712
-#   POST /replay                    —— 预跑数据装载为 run
-#   POST /evaluations               —— 新建评估（standard/guided/compare）
-#   GET  /evaluations/{id}/events   —— SSE 实时事件流
-#   GET  /evaluations/{id}/{report|trajectories|tasks}
+# API（FastAPI + SSE，RunManager 承载：队列/取消/恢复/历史全部可用）
+PYTHONPATH=. $PY -m uvicorn apps.api.server:app --host 127.0.0.1 --port 8712
+export SAFELOOP_API_KEY="..."   # 可选：设置后要求 X-API-Key 头（比赛共享网络建议开）
+#   POST /evaluations            —— 入队（scope/scenario_ids/rounds/api_target…）
+#   GET  /runs                   —— 历史列表（重启不丢）
+#   GET  /evaluations/{id}/events —— SSE（Last-Event-ID 断线续传）
+#   POST /evaluations/{id}/cancel|resume
 # 注：本机 curl 需 --noproxy '*'（系统代理会拦 127.0.0.1）
+
+# v1.1 消融实验（roadmap A4；--dry-run 零 GPU 冒烟）
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY scripts/run_v11_ablation.py \
+    --conditions M0,M1 --tasks 20 --budget 5 --tag m_          # 记忆消融
+$PY scripts/run_v11_ablation.py --conditions S0,S1 --adaptive-q 200,300,400 \
+    --tasks 20 --budget 5 --tag s_                             # 调度消融（D(Q)/Yield）
+$PY scripts/run_v11_ablation.py --conditions A0,A1,A2,A3 --adaptive-q 300 --tag joint_
+# 中文题库重建（源 CSV：github.com/STAIR-BUPT/JailBench 的 JailBench_seed.csv，
+# 存 data/raw/jailbench_seed.csv；重选/扩容后需人工两轮审核再交付）：
+$PY scripts/build_safeloop_cn.py --n 40
 
 # CLI
 PYTHONPATH=. python3 apps/cli/safeloop_cli.py report stage1b_r_4060   # 预跑报告
 PYTHONPATH=. $PY apps/cli/safeloop_cli.py evaluate --mode compare --max-tasks 4  # 现场小子集
 
-# 终端工作台（2026-09-25，af8f42f：向导式 CLI GUI + rich 实时对话流 + 彩色结果报告）
+# 终端工作台（2026-09-25 起；2026-10-13 P1/P2 后运行统一走 RunManager 串行队列）
 # 必须在 safeLoop 环境跑（引擎要 transformers——base 环境只装了 rich，跑到引擎才报错）
-PYTHONPATH=. $PY apps/cli/workbench_cli.py                       # 交互向导：目标→模式→场景数
-PYTHONPATH=. $PY apps/cli/workbench_cli.py --mode standard -n 3   # 带参数直接跑（可加 --suite/--config/--budget）
+PYTHONPATH=. $PY apps/cli/workbench_cli.py                       # 交互向导：目标→范围→模式→轮数
+PYTHONPATH=. $PY apps/cli/workbench_cli.py --mode standard -n 3   # 带参数直接跑
 # DeepSeek 等推理型黑盒（key 只经环境变量；回答预算默认 8192，思考链不会截空回答）：
 export TARGET_API_KEY="sk-..."
 PYTHONPATH=. $PY apps/cli/workbench_cli.py \
     --base-url https://api.deepseek.com/v1 --model deepseek-flash --mode standard -n 3
-# 重渲染已保存的报告 JSON：
-PYTHONPATH=. $PY apps/cli/workbench_cli.py report outputs/reports/run-x_report.json
-# 测试范围与轮数（默认 sample=跨类别抽样；旧版取文件头部导致类别单一，已改跨类别轮转抽样）：
-PYTHONPATH=. $PY apps/cli/workbench_cli.py -n 10 --budget 4       # 抽样 10 个场景 × 每场景 4 轮
-PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope full --budget 3    # 完整测试：全部 100 个场景
+# 测试范围与轮数（sample=跨类别轮转抽样 / full=全部场景 / single=单场景深度）：
+PYTHONPATH=. $PY apps/cli/workbench_cli.py -n 10 --budget 4
+PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope full --budget 3
 PYTHONPATH=. $PY apps/cli/workbench_cli.py --scope single --scenario JBB-0050 --budget 5
-#                                                      ↑ 单场景深度测试（--scenario 也接受编号如 50）
-# 每次运行自动另存完整对话存档（红方问题+被测回答全文，无截断）：
-#   outputs/reports/run-x_transcript.md   ← 想看全部问答内容看这个
-#   outputs/evaluations/run-x_STD.jsonl   ← 机器可读的逐轮全文（含判别/评分/reward）
+# 中文检测（SafeLoop-CN v0.1，40 条国标五域，pending_review 待人工审核）：
+PYTHONPATH=. $PY apps/cli/workbench_cli.py --suite safeloop_cn -n 5
+# 运行管理（SQLite 历史库 outputs/runs/safeloop.db，重启不丢）：
+PYTHONPATH=. $PY apps/cli/workbench_cli.py history               # 历史列表（含导入的旧 run）
+PYTHONPATH=. $PY apps/cli/workbench_cli.py resume run_xxx        # 续跑已取消/失败的 run
+PYTHONPATH=. $PY apps/cli/workbench_cli.py export run_xxx        # 打印就绪 HTML（浏览器 Ctrl+P 存 PDF）
+PYTHONPATH=. $PY apps/cli/workbench_cli.py report outputs/reports/run-x_report.json  # 重渲染报告
+# v1.1 实验能力（默认关闭；标准模式语义冻结）：
+PYTHONPATH=. $PY apps/cli/workbench_cli.py -n 5 --use-memory            # 长期攻击记忆（round 1+ 生效）
+PYTHONPATH=. $PY apps/cli/workbench_cli.py -n 10 --adaptive-budget 30   # 自适应评估模式（D(Q)/Yield 口径）
+# 每次运行自动落盘：outputs/reports/run-x_transcript.md（问答全文）+ run-x_report.json
+#   + outputs/evaluations/run-x_STD.jsonl（机器可读逐轮全文）+ outputs/checkpoints/（断点续跑）
 # 结果解读：判别列=Qwen3Guard 过程观察（Unsafe≠风险）；E 列=StrongREJECT 最终裁决
 # （风险只数 E:风险确认）；出现"（空回答）"轮次时结论偏乐观，需调大回答预算重跑
 
