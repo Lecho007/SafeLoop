@@ -29,6 +29,14 @@
           </div>
         </template>
         <template v-else>
+          <div v-if="savedTargets.length" style="margin-bottom:2px">
+            <div class="lbl">已保存的模型接口（本机浏览器，不含密钥）</div>
+            <el-select v-model="savedIdx" size="default" clearable
+              placeholder="选择已保存的接口快速填充" @change="applySaved">
+              <el-option v-for="(s, i) in savedTargets" :key="i"
+                :label="s.model + ' ｜ ' + s.base_url" :value="i" />
+            </el-select>
+          </div>
           <div class="lbl">接口协议</div>
           <el-select v-model="wizard.provider" size="default">
             <el-option label="OpenAI 兼容（chat/completions）" value="openai_chat" />
@@ -142,6 +150,17 @@
         <el-button v-if="['RUNNING', 'CANCELLING'].includes(store.run?.status)"
           size="small" type="warning" plain @click="stop">停止</el-button>
       </div>
+      <!-- v1.1 能力运行态（A5 可视化） -->
+      <div v-if="store.activeAdaptiveQ || store.activeUseMemory" class="v11-bar">
+        <template v-if="store.activeAdaptiveQ">
+          <span class="sl-meta" style="color:var(--live);font-weight:600">智能预算</span>
+          <el-progress :percentage="adaptPct" :stroke-width="8" style="flex:1;max-width:280px"
+            :show-text="false" color="#7556d8" />
+          <span class="sl-meta">{{ store.run?.steps_done ?? 0 }}/{{ store.activeAdaptiveQ }} 次调用 · 调度器按风险覆盖分配轮次</span>
+        </template>
+        <span v-if="store.activeUseMemory" class="sl-meta" style="color:var(--live)">
+          ◈ 长期记忆生效中（round 1+ · 复用同目标的历史测试经验）</span>
+      </div>
       <RunTerminal :right="'…' + String(store.activeRunId || '').slice(-6)"
         :right-title="store.activeRunId" legend>
         <template #head>
@@ -154,7 +173,8 @@
         <template v-for="(e, i) in liveEvents" :key="i">
           <div class="t-round">
             <span class="sg" :class="sgOf(e)"></span>{{ e.branch ? '［' + e.branch + '］' : '' }}R{{ e.round }}
-            · {{ e.task_id }} · {{ stratZh(e.strategy) }} · {{ judgeTxt(e) }}
+            · {{ e.task_id }} · {{ stratZh(e.strategy) }} · {{ judgeTxt(e) }}<span
+            v-if="e.memory_used" class="mem-tag" title="本轮红方检索了历史测试经验">经验</span>
           </div>
           <div class="t-q"><div class="t-role">TESTER ▸</div>{{ clip(e.prompt, 240) }}<a
             v-if="len(e.prompt) > 240" class="tx-link"
@@ -316,6 +336,32 @@ const estRange = computed(() => {
 watch(() => [wizard.provider, wizard.baseUrl, wizard.model, wizard.keyEnv],
   () => { conn.value = null })
 
+// ---- API 目标配置持久化（P4：保存非敏感配置；只存本机浏览器，密钥永不落盘）
+const SAVED_KEY = 'safeloop_api_targets'
+const savedTargets = ref([])
+const savedIdx = ref(null)
+function loadSaved() {
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]') } catch (e) { return [] }
+}
+function saveTarget() {
+  if (!(wizard.baseUrl.trim() && wizard.model.trim())) return
+  const item = { provider: wizard.provider, base_url: wizard.baseUrl.trim(),
+    model: wizard.model.trim(), key_env: wizard.keyEnv.trim() }
+  const rest = savedTargets.value.filter(s =>
+    !(s.base_url === item.base_url && s.model === item.model))
+  savedTargets.value = [item, ...rest].slice(0, 6)
+  localStorage.setItem(SAVED_KEY, JSON.stringify(savedTargets.value))
+}
+function applySaved(v) {
+  if (v === null || v === '' || v === undefined) return
+  const s = savedTargets.value[v]
+  if (!s) return
+  wizard.provider = s.provider
+  wizard.baseUrl = s.base_url
+  wizard.model = s.model
+  wizard.keyEnv = s.key_env || 'TARGET_API_KEY'
+}
+
 async function testConn() {
   connLoading.value = true
   try {
@@ -323,6 +369,7 @@ async function testConn() {
       provider: wizard.provider, base_url: wizard.baseUrl.trim(),
       model: wizard.model.trim(), api_key_env: wizard.keyEnv.trim(),
     })
+    if (conn.value?.ok) saveTarget()   // 验证通过才值得记住
   } catch (e) { conn.value = { ok: false, error: String(e) } }
   connLoading.value = false
 }
@@ -400,6 +447,8 @@ const liveEvents = computed(() => store.live?.events || [])
 const liveRounds = computed(() => liveEventsToRounds(liveEvents.value))
 const progressPct = computed(() => Math.min(100,
   Math.round(((store.run?.steps_done || 0) / Math.max(1, store.run?.total_steps || 1)) * 100)))
+const adaptPct = computed(() => Math.min(100,
+  Math.round(((store.run?.steps_done || 0) / Math.max(1, store.activeAdaptiveQ || 1)) * 100)))
 const runStateZh = computed(() => ({
   QUEUED: '排队中（单 GPU 串行队列）', RUNNING: '多轮对话测试',
   CANCELLING: '正在停止（当前调用结束后生效）', EVALUATING: '独立评审',
@@ -411,6 +460,12 @@ let tickTimer = null
 onMounted(() => {
   tickTimer = setInterval(() => { nowTick.value = Date.now() }, 1000)
   if (store.activeRunId && !store.timer) store.startPolling()
+  // 恢复上次保存的 API 目标配置（非敏感四项）
+  savedTargets.value = loadSaved()
+  if (savedTargets.value[0] && !wizard.baseUrl) {
+    applySaved(0)
+    savedIdx.value = 0
+  }
 })
 onUnmounted(() => {
   clearInterval(tickTimer)

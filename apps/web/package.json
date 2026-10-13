@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "smoke": "node tests/smoke.mjs"
   },
   "dependencies": {
-    "element-plus": "^2.7.0",
     "@element-plus/icons-vue": "^2.3.1",
+    "element-plus": "^2.7.0",
     "pinia": "^2.1.0",
     "vue": "^3.4.0"
   },

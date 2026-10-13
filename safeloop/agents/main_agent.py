@@ -411,6 +411,7 @@ class SafeLoopMainAgent:
             self._last_scheduler = sched
 
         def _on_step(step, slot):
+            routing = (getattr(step.action, "metadata", None) or {}).get("routing") or {}
             self.live_events.append({
                 "branch": br["name"],
                 "task_id": slot.task.task_id,
@@ -422,6 +423,7 @@ class SafeLoopMainAgent:
                 "safety": step.judge_output.metadata.get("safety"),
                 "action": (step.feedback.adaptation_action
                            if step.feedback else None),
+                "memory_used": bool(routing.get("memory_used")),
                 "success": bool(step.external_evaluation
                                 and step.external_evaluation.success),
             })

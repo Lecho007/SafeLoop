@@ -19,6 +19,9 @@ export const useStore = defineStore('main', {
     viewedReport: null,
     viewedTrajs: null,
     historyVersion: 0,  // 历史列表刷新信号
+    // 当前活动 run 的 v1.1 能力开关（A5 可视化；从 spec 同步，续跑/恢复也对）
+    activeUseMemory: false,
+    activeAdaptiveQ: null,
   }),
   getters: {
     running: (s) => !!s.activeRunId,
@@ -64,6 +67,10 @@ export const useStore = defineStore('main', {
         try {
           this.run = await api.getRun(this.activeRunId)
           this.live = await api.getLive(this.activeRunId)
+          // A5：v1.1 能力开关随 spec 同步（提交/续跑/刷新恢复统一走这里）
+          const sp = this.run.spec || {}
+          this.activeUseMemory = !!sp.use_memory
+          this.activeAdaptiveQ = sp.adaptive_budget || null
           fails = 0
           this.pollError = false
           if (TERMINAL.includes(this.run.status)) {

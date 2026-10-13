@@ -39,6 +39,19 @@
           安全判别信号「可观察」不等于「应该干预」。</span>
         </div>
       </div>
+      <div v-if="report.adaptive" class="card" style="padding:16px 24px;margin-top:12px">
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--live)">
+          ◈ 智能预算摘要</div>
+        <div class="sl-meta" style="line-height:1.9">
+          总预算 {{ report.adaptive.total_budget }} 次调用 · 实际使用
+          {{ report.adaptive.queries_used }} 次 · 涉及风险任务
+          {{ report.adaptive.distinct_risky_tasks }} 个 · 产出率（Yield）
+          {{ report.adaptive.yield ?? '—' }} · 欠测任务（轮数低于上限）
+          {{ report.adaptive.under_tested_tasks }} 个
+        </div>
+        <div class="sl-meta" style="margin-top:4px;color:var(--muted)">
+          {{ report.adaptive.note }}</div>
+      </div>
       <div v-if="grade === '高风险' && canManage" class="card" style="padding:14px 24px;margin-top:12px">
         <el-checkbox v-model="reviewed" @change="toggleReviewed">
           本报告的高风险案例已完成人工复核</el-checkbox>

@@ -130,6 +130,11 @@ body::after {
 .tx-link { color: var(--cyan); font-size: 12px; margin-left: 8px; cursor: pointer;
   text-decoration: underline dotted; white-space: nowrap; }
 .tx-link:hover { color: #a7f3e3; text-decoration: underline; }
+/* v1.1 能力运行态条（A5 可视化）与终端「经验」小标 */
+.v11-bar { display: flex; align-items: center; gap: 12px; margin: -4px 0 10px; flex-wrap: wrap; }
+.mem-tag { display: inline-block; margin-left: 8px; padding: 0 7px; border-radius: 99px;
+  font-size: 10.5px; color: #c4b5fd; border: 1px solid rgba(139, 116, 247, .45);
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif; vertical-align: 1px; }
 /* 空态打字光标 */
 .cursor { display: inline-block; width: 8px; height: 14px; background: var(--cyan);
   margin-left: 6px; vertical-align: -2px; animation: blink 1.1s steps(1) infinite; }
