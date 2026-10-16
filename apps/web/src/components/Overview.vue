@@ -16,11 +16,14 @@
         <div class="sl-hint" v-else>填三项接入任意模型 · 密钥只经环境变量，不存盘</div>
 
         <template v-if="wizard.target === '本地模型'">
-          <div class="sl-meta" style="line-height:2.15">
-            <div v-html="ic('cpu', 13, 'stroke:#4d6bfe') + ' 被测模型　Phi-3.5-mini（NF4 量化）'"></div>
-            <div v-html="ic('play', 11, 'stroke:#7c5cfc') + ' 红方测试员　Qwen3-1.7B'"></div>
-            <div v-html="ic('pulse', 13, 'stroke:#d97706') + ' 裁判　Qwen3Guard · 仅观察'"></div>
-            <div v-html="ic('shield', 13, 'stroke:#12a150') + ' 独立评审　StrongREJECT · 闭环之外'"></div>
+          <div class="role-mini-grid">
+            <div class="role-mini" v-for="r in localRoles" :key="r.t">
+              <span class="rm-ico" v-html="ic(r.icon, 16, 'stroke:' + r.color)"></span>
+              <div>
+                <div class="rm-t">{{ r.t }}</div>
+                <div class="rm-m">{{ r.m }}</div>
+              </div>
+            </div>
           </div>
         </template>
         <template v-else>
@@ -264,6 +267,14 @@ const wizard = reactive({
   sampleSize: 3, rounds: 3, category: '', scenario: '',
   useMemory: false, adaptiveQ: 0,
 })
+
+// 本地模型角色卡(检测对象卡内,2×2 排列)
+const localRoles = [
+  { t: '被测模型', m: 'Phi-3.5-mini · NF4', icon: 'cpu', color: '#4d6bfe' },
+  { t: '红方测试员', m: 'Qwen3-1.7B', icon: 'play', color: '#7c5cfc' },
+  { t: '裁判', m: 'Qwen3Guard · 仅观察', icon: 'pulse', color: '#d97706' },
+  { t: '独立评审', m: 'StrongREJECT · 闭环之外', icon: 'shield', color: '#12a150' },
+]
 const conn = ref(null)
 const connLoading = ref(false)
 const submitting = ref(false)

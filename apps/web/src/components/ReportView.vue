@@ -2,12 +2,11 @@
   <div>
     <div class="sl-sec" v-html="secIcon + '　评估报告'"></div>
 
-    <!-- 空态:轻提示 + 演示报告预览(带关键数字,内容充实不空荡) -->
+    <!-- 空态:演示报告选择(点击即看) -->
     <div v-if="!report" class="demo-rpts">
       <div class="dr-hero">
-        <div class="drh-t">还没有正在查看的报告</div>
-        <div class="drh-d">完成一次检测后会自动展示在这里;也可以先点开下面任意一份演示报告——
-          都是历史真实运行的数据,秒级载入、可随意切换。</div>
+        <div class="drh-t">选择一份报告开始</div>
+        <div class="drh-d">检测完成后报告会自动展示;也可以先看演示。</div>
       </div>
       <div class="dr-grid">
         <div v-for="d in demos" :key="d.id" class="dr-card tone-x" :class="d.tone">
@@ -18,20 +17,55 @@
             <div class="dk-k">风险发现率<br/><b>{{ d.risk }}/{{ d.total }}</b> 场景确认</div>
           </div>
           <div class="dr-d">{{ d.d }}</div>
-          <div class="dr-meta">{{ d.meta }}</div>
           <el-button size="small" type="primary" plain :loading="loading === d.id"
             @click="loadDemo(d.id)">查看这份报告</el-button>
         </div>
       </div>
-      <div class="dr-tip">看完演示想上手?去 <a href="#/workbench">检测工作台</a> 发起一次真实检测,
-        或回 <a href="#/home">首页</a> 了解平台能力。</div>
     </div>
 
-    <template v-else>
+    <!-- AI 分析聊天(常驻;点击生成后才开始分析) -->
+    <div class="card ai-card" style="padding:16px 20px;margin-top:12px">
+      <div class="ai-head">
+        <span class="ai-badge">AI</span>
+        <span style="font-size:15px;font-weight:700">AI 分析</span>
+        <span class="sp"></span>
+        <el-button v-if="chatMsgs.length" size="small" link
+          :disabled="aiLoading" @click="resetAi">重新开始</el-button>
+      </div>
+      <div class="chat-body" ref="chatBox">
+        <div v-if="!chatMsgs.length && !aiLoading" class="chat-empty">
+          <el-button size="small" type="primary" plain @click="genAi('')">
+            {{ report ? '生成 AI 分析' : '生成演示报告的 AI 分析' }}</el-button>
+        </div>
+        <template v-for="(m, i) in chatMsgs" :key="i">
+          <div v-if="m.role === 'assistant'" class="msg ai">
+            <span class="msg-ava">AI</span>
+            <div class="msg-bubble">{{ m.content }}</div>
+          </div>
+          <div v-else-if="m.role === 'user'" class="msg me">
+            <div class="msg-bubble">{{ m.content }}</div>
+            <span class="msg-ava me-ava">我</span>
+          </div>
+        </template>
+        <div v-if="aiLoading" class="msg ai">
+          <span class="msg-ava">AI</span>
+          <div class="msg-bubble typing"><span class="d1"></span><span class="d2"></span><span class="d3"></span></div>
+        </div>
+      </div>
+      <div class="chat-input">
+        <el-input v-model="chatDraft" placeholder="向 AI 追问这份报告，回车发送…"
+          :disabled="aiLoading || !chatMsgs.length" @keyup.enter="sendAi" clearable />
+        <el-button type="primary" :loading="aiLoading" :disabled="!chatDraft.trim()"
+          @click="sendAi">发送</el-button>
+      </div>
+      <el-alert v-if="aiError" type="warning" :closable="false" :title="aiError"
+        style="margin-top:8px" />
+    </div>
+
+    <template v-if="report">
       <!-- 返回选择态(演示/历史入口) -->
       <div class="rp-back">
         <el-button size="small" @click="backToSelect">← 换一份报告</el-button>
-        <span class="sl-meta">当前查看：{{ store.viewedRunId }}（也可从下方历史报告直接切换）</span>
       </div>
 
       <!-- 等级徽章卡 + 操作区 -->
@@ -71,46 +105,6 @@
         </div>
       </div>
 
-      <!-- AI 分析(对话式;本地 Qwen3-4B,只解读不裁决) -->
-      <div class="card ai-card" style="padding:16px 20px;margin-top:12px">
-        <div class="ai-head">
-          <span class="ai-badge">AI</span>
-          <span style="font-size:15px;font-weight:700">AI 分析</span>
-          <span class="sl-meta">本地 Qwen3-4B · 仅供参考，评估结论以独立评审为准</span>
-          <span class="sp"></span>
-          <el-button v-if="chatMsgs.length" size="small" link
-            :disabled="aiLoading" @click="resetAi">重新开始</el-button>
-        </div>
-        <div class="chat-body" ref="chatBox">
-          <div v-if="!chatMsgs.length && !aiLoading" class="chat-empty">
-            <el-button size="small" type="primary" plain @click="genAi('')">
-              生成 AI 分析</el-button>
-            <span class="sl-meta">用本地语言模型解读这份报告，之后可以继续追问</span>
-          </div>
-          <template v-for="(m, i) in chatMsgs" :key="i">
-            <div v-if="m.role === 'assistant'" class="msg ai">
-              <span class="msg-ava">AI</span>
-              <div class="msg-bubble">{{ m.content }}</div>
-            </div>
-            <div v-else-if="m.role === 'user'" class="msg me">
-              <div class="msg-bubble">{{ m.content }}</div>
-              <span class="msg-ava me-ava">我</span>
-            </div>
-          </template>
-          <div v-if="aiLoading" class="msg ai">
-            <span class="msg-ava">AI</span>
-            <div class="msg-bubble typing"><span class="d1"></span><span class="d2"></span><span class="d3"></span></div>
-          </div>
-        </div>
-        <div class="chat-input">
-          <el-input v-model="chatDraft" placeholder="向 AI 追问这份报告，回车发送…"
-            :disabled="aiLoading" @keyup.enter="sendAi" clearable />
-          <el-button type="primary" :loading="aiLoading" :disabled="!chatDraft.trim()"
-            @click="sendAi">发送</el-button>
-        </div>
-        <el-alert v-if="aiError" type="warning" :closable="false" :title="aiError"
-          style="margin-top:8px" />
-      </div>
       <div v-if="report.adaptive" class="card" style="padding:16px 24px;margin-top:12px">
         <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--live)">
           ◈ 智能预算摘要</div>
@@ -143,20 +137,17 @@
       </el-collapse>
     </template>
 
-    <!-- 历史报告(常驻;点击直接切换查看,无需刷新) -->
+    <!-- 历史报告(常驻;点击直接切换) -->
     <div class="hist-rpts">
-      <div class="hr-head">历史报告
-        <span class="sl-meta">（完成的运行,点击直接切换查看）</span></div>
+      <div class="hr-head">历史报告</div>
       <div v-if="!histRows.length" class="sl-meta" style="padding:6px 2px">暂无历史报告</div>
       <div v-else class="glass hist">
         <div class="hrow" v-for="r in histRows" :key="r.run_id">
-          <span class="rid">{{ r.run_id }} {{ r.run_id === store.viewedRunId ? '（当前查看）' : '' }}</span>
-          <span class="sl-meta">{{ modeZh(r.mode) }}</span>
-          <span class="sl-meta">{{ r.target || '' }}</span>
-          <span class="sl-meta">对话 {{ r.steps_done }}/{{ r.total_steps || '?' }}</span>
-          <span class="sl-meta">{{ (r.created_at || '').slice(0, 19) }}</span>
+          <span class="hname">{{ friendlyName(r) }}
+            {{ r.run_id === store.viewedRunId ? '（当前查看）' : '' }}</span>
+          <span class="sl-meta">{{ (r.created_at || '').slice(5, 16) }}</span>
           <span class="sp"></span>
-          <el-button size="small" :type="r.run_id === store.viewedRunId ? 'primary' : 'primary'"
+          <el-button size="small" type="primary"
             :plain="r.run_id !== store.viewedRunId" @click="viewHist(r.run_id)">
             {{ r.run_id === store.viewedRunId ? '重新加载' : '查看' }}</el-button>
         </div>
@@ -325,7 +316,11 @@ async function loadAiCache() {
   } catch (e) { /* 无缓存静默 */ }
 }
 async function genAi(message = '') {
-  const id = store.viewedRunId
+  let id = store.viewedRunId
+  if (!id && !message) {          // 空态点"生成":自动载入默认演示再分析
+    try { await loadDemo(demos[0].id) } catch (e) { ElMessage.error('载入失败：' + e) }
+    id = store.viewedRunId
+  }
   if (!id || aiLoading.value) return
   aiLoading.value = true; aiError.value = ''
   if (message) chatMsgs.value.push({ role: 'user', content: message })
@@ -359,6 +354,16 @@ async function resetAi() {
 }
 watch(() => store.viewedRunId, loadAiCache, { immediate: true })
 const modeZh = (m) => ({ standard: '标准', guided: '引导', compare: '对比' }[m] || m || '')
+const targetZh = (t) => {
+  if (!t || /phi/i.test(t)) return '本地模型'
+  if (/deepseek/i.test(t)) return 'DeepSeek'
+  return t
+}
+function friendlyName(r) {
+  const parts = [modeZh(r.mode) + '检测', targetZh(r.target)]
+  if (r.n_tasks) parts.push(r.n_tasks + ' 场景')
+  return parts.filter(Boolean).join(' · ')
+}
 const histRows = ref([])
 async function loadHist() {
   try {
