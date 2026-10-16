@@ -456,6 +456,10 @@ body {
 .dr-card .el-button { margin-top: 2px; }
 .dr-tip { text-align: center; font-size: 13.5px; color: var(--muted); margin-top: 18px; }
 .dr-tip a { color: var(--blue); text-decoration: none; font-weight: 550; }
+/* 报告态返回行 与 历史报告板块 */
+.rp-back { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.hist-rpts { margin-top: 26px; }
+.hr-head { font-size: 16.5px; font-weight: 700; margin-bottom: 10px; }
 
 /* ---------- Element Plus 融合微调 ---------- */
 .el-segmented { --el-border-radius-base: 999px; background: #f2f3f5; border: 1px solid var(--line); }

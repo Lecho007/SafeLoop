@@ -115,5 +115,11 @@ export const useStore = defineStore('main', {
       this.viewedReport = report
       this.viewedTrajs = trajs
     },
+    // 返回报告选择态（演示/历史入口）
+    clearViewed() {
+      this.viewedRunId = null
+      this.viewedReport = null
+      this.viewedTrajs = null
+    },
   },
 })

@@ -28,6 +28,12 @@
     </div>
 
     <template v-else>
+      <!-- 返回选择态(演示/历史入口) -->
+      <div class="rp-back">
+        <el-button size="small" @click="backToSelect">← 换一份报告</el-button>
+        <span class="sl-meta">当前查看：{{ store.viewedRunId }}（也可从下方历史报告直接切换）</span>
+      </div>
+
       <!-- 等级徽章卡 + 操作区 -->
       <div class="glass grade-card" :class="dotCls">
         <div class="gc-main">
@@ -95,11 +101,31 @@
         </el-collapse-item>
       </el-collapse>
     </template>
+
+    <!-- 历史报告(常驻;点击直接切换查看,无需刷新) -->
+    <div class="hist-rpts">
+      <div class="hr-head">历史报告
+        <span class="sl-meta">（完成的运行,点击直接切换查看）</span></div>
+      <div v-if="!histRows.length" class="sl-meta" style="padding:6px 2px">暂无历史报告</div>
+      <div v-else class="glass hist">
+        <div class="hrow" v-for="r in histRows" :key="r.run_id">
+          <span class="rid">{{ r.run_id }} {{ r.run_id === store.viewedRunId ? '（当前查看）' : '' }}</span>
+          <span class="sl-meta">{{ modeZh(r.mode) }}</span>
+          <span class="sl-meta">{{ r.target || '' }}</span>
+          <span class="sl-meta">对话 {{ r.steps_done }}/{{ r.total_steps || '?' }}</span>
+          <span class="sl-meta">{{ (r.created_at || '').slice(0, 19) }}</span>
+          <span class="sp"></span>
+          <el-button size="small" :type="r.run_id === store.viewedRunId ? 'primary' : 'primary'"
+            :plain="r.run_id !== store.viewedRunId" @click="viewHist(r.run_id)">
+            {{ r.run_id === store.viewedRunId ? '重新加载' : '查看' }}</el-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { icon, zhCat } from '../icons.js'
 import { api } from '../api.js'
@@ -110,7 +136,7 @@ const secIcon = icon('doc', 16)
 const dlIcon = icon('download', 13)
 const docIcon = icon('doc', 13)
 
-// ---- 演示报告(空态展示;均为历史真实运行数据,零 GPU 秒级载入)
+// ---- 演示报告(空态展示;仅收录带独立评审标签、报告有效的真实运行,零 GPU 秒级载入)
 const loading = ref('')
 const demos = [
   { id: 'stage1b_r_4060', badge: '对比检测', tone: 'tone-blue',
@@ -118,20 +144,15 @@ const demos = [
     rate: '38%', risk: '38', total: '100', rateCls: 'red',
     d: '两支并行对比引导是否有效,JBB-100 全量任务集,含完整轨迹与对比结论',
     meta: '英文基准 · 100 场景 · 5 轮' },
-  { id: 'stage1b_a_4060', badge: '标准检测', tone: 'tone-green',
-    t: '内容域反馈验证 · 70 场景',
-    rate: '36%', risk: '25', total: '70', rateCls: 'red',
-    d: '内容可观测子集上,无反馈与结构化反馈两条件的完整证据链',
-    meta: '英文基准 · 70 场景 · 5 轮' },
-  { id: 'stage1b_b_4060', badge: '消融系列', tone: 'tone-purple',
-    t: '多信号判别消融 · 30 场景',
-    rate: '37%', risk: '11', total: '30', rateCls: 'red',
-    d: '目标合规域上五种判别条件的对照运行,适合研究对照查看',
-    meta: '英文基准 · 30 场景 · 5 轮' },
-  { id: 'run-8d1aa38232', badge: '黑盒 API', tone: 'tone-orange',
-    t: 'DeepSeek 在线检测 · 3 场景',
+  { id: 'run-e700e52186', badge: '黑盒 API', tone: 'tone-rose',
+    t: 'DeepSeek 标准检测 · 3 场景',
+    rate: '67%', risk: '2', total: '3', rateCls: 'red',
+    d: '在线 API 黑盒目标的真实运行:3 个场景中 2 个被独立评审确认存在风险响应',
+    meta: '中文场景 · 3 场景 · 标准模式' },
+  { id: 'run-8d1aa38232', badge: '黑盒 API', tone: 'tone-green',
+    t: 'DeepSeek 引导检测 · 3 场景',
     rate: '0%', risk: '0', total: '3', rateCls: 'green',
-    d: '在线 API 黑盒目标的真实运行样例:3 个合规域场景全部抵御',
+    d: '智能引导模式下的在线检测样例:3 个合规域场景全部抵御',
     meta: '中文场景 · 3 场景 · 引导模式' },
 ]
 
@@ -235,4 +256,21 @@ async function toggleReviewed(v) {
     ElMessage.error('标记失败：' + e)
   }
 }
+
+// ---- 返回选择态 / 历史报告
+function backToSelect() { store.clearViewed() }
+const modeZh = (m) => ({ standard: '标准', guided: '引导', compare: '对比' }[m] || m || '')
+const histRows = ref([])
+async function loadHist() {
+  try {
+    const rows = await api.listRuns(20)
+    histRows.value = rows.filter(r => r.status === 'COMPLETED')
+  } catch (e) { /* 服务不可达 */ }
+}
+async function viewHist(id) {
+  try { await store.viewRun(id) }
+  catch (e) { ElMessage.error('无法加载：' + e) }
+}
+onMounted(loadHist)
+watch(() => store.historyVersion, loadHist)
 </script>

@@ -72,10 +72,18 @@ try {
 
   // ---- 报告页空态:演示报告选择 ----
   await goto('report')
-  ok('报告空态演示卡(4份)', (await page.locator('.dr-card').count()) === 4)
+  ok('报告空态演示卡(3份,均有效源)', (await page.locator('.dr-card').count()) === 3)
+  ok('历史报告板块', (await page.locator('.hist-rpts .hrow').count()) >= 1)
   await page.locator('.dr-card').first().getByRole('button', { name: '查看这份报告' }).click()
   await page.waitForTimeout(2000)
   ok('演示卡载入出报告', (await page.locator('.grade-card').count()) === 1)
+  ok('返回按钮出现并可回选择态', (await page.getByRole('button', { name: '换一份报告' }).count()) >= 1)
+  await page.getByRole('button', { name: '换一份报告' }).click()
+  await page.waitForTimeout(500)
+  ok('返回后演示卡重新出现', (await page.locator('.dr-card').count()) === 3)
+  await page.locator('.hist-rpts .hrow').first().getByRole('button').click()
+  await page.waitForTimeout(2000)
+  ok('历史报告直接切换成功', (await page.locator('.grade-card').count()) === 1)
 
   // ---- 演示报告(首页 CTA → 报告页) ----
   await goto('home')
