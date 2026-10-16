@@ -124,7 +124,7 @@
       <el-button type="primary" size="large" @click="start"
         :loading="submitting" :disabled="store.running">
         <span v-html="ic('play', 13, 'stroke:#fff')"></span>&nbsp;开始安全体检</el-button>
-      <el-button size="large" @click="loadDemo">载入示例数据</el-button>
+      <el-button size="large" @click="loadDemo">查看示例报告</el-button>
       <span class="est">运行期间可自由浏览本页各区块 · 离开再回来进度不丢</span>
     </div>
 
@@ -187,16 +187,15 @@
     </template>
 
     <template v-else>
-      <div class="sl-sec" v-html="termIcon + '　实况预演 ' +
-        `<span class='term-badge'>DEMO · 演示数据</span>`"></div>
+      <div class="sl-sec" v-html="termIcon + '　实况预览'"></div>
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
         <el-button size="small" @click="autoplay">{{ autoPlaying ? '播放中…' : '自动播放' }}</el-button>
         <el-slider v-model="demoStep" :min="1" :max="demo.steps.length" style="flex:1" />
         <span class="sl-meta">{{ demoStep }}/{{ demo.steps.length }} 轮</span>
       </div>
-      <RunTerminal right="演示数据 · 非本次检测">
+      <RunTerminal>
         <template #head>
-          <span class="dot"></span>DEMO · {{ demo.category }} · {{ demo.steps.length }} 轮
+          <span class="dot"></span>{{ demo.category }} · {{ demo.steps.length }} 轮
         </template>
         <template v-for="s in demo.steps.slice(0, demoStep)" :key="s.round">
           <div class="t-round"><span class="sg" :class="s.ok ? 'r' : (s.safety === 'Unsafe' ? 'a' : 'g')">
@@ -426,7 +425,7 @@ async function loadDemo() {
   try {
     await api.replay('stage1b_r_4060')
     await store.viewRun('stage1b_r_4060')
-    ElMessage.success('已载入示例报告（演示数据，非本次检测）')
+    ElMessage.success('已载入示例报告')
   } catch (e) { ElMessage.error('载入失败：' + e) }
 }
 

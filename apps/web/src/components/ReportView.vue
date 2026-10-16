@@ -6,7 +6,7 @@
     <div v-if="!report" class="demo-rpts">
       <div class="dr-hero">
         <div class="drh-t">选择一份报告开始</div>
-        <div class="drh-d">检测完成后报告会自动展示;也可以先看演示。</div>
+        <div class="drh-d">检测完成后报告会自动展示;也可以先查看一份示例报告。</div>
       </div>
       <div class="dr-grid">
         <div v-for="d in demos" :key="d.id" class="dr-card tone-x" :class="d.tone">
@@ -35,7 +35,7 @@
       <div class="chat-body" ref="chatBox">
         <div v-if="!chatMsgs.length && !aiLoading" class="chat-empty">
           <el-button size="small" type="primary" plain @click="genAi('')">
-            {{ report ? '生成 AI 分析' : '生成演示报告的 AI 分析' }}</el-button>
+            {{ report ? '生成 AI 分析' : '生成示例报告的 AI 分析' }}</el-button>
         </div>
         <template v-for="(m, i) in chatMsgs" :key="i">
           <div v-if="m.role === 'assistant'" class="msg ai">
@@ -78,7 +78,7 @@
           </div>
           <span class="gc-sp"></span>
           <div class="gc-ops">
-            <el-tooltip :disabled="canManage" content="演示/外部数据不在运行库，不支持导出"
+            <el-tooltip :disabled="canManage" content="该报告不在运行库，不支持导出"
               placement="top">
               <span>
                 <el-button size="small" :loading="exporting" :disabled="!canManage"
@@ -86,7 +86,7 @@
                   <span v-html="dlIcon"></span>&nbsp;导出 HTML 报告</el-button>
               </span>
             </el-tooltip>
-            <el-tooltip :disabled="canManage" content="演示/外部数据无对话存档"
+            <el-tooltip :disabled="canManage" content="该报告没有对话存档"
               placement="top">
               <span>
                 <el-button size="small" :disabled="!canManage" @click="doTranscript">
@@ -193,7 +193,7 @@ async function loadDemo(id) {
   try {
     await api.replay(id)
     await store.viewRun(id)
-    ElMessage.success('已载入演示报告（历史真实运行数据）')
+    ElMessage.success('已载入示例报告')
   } catch (e) { ElMessage.error('载入失败：' + e) }
   loading.value = ''
 }

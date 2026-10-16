@@ -9,7 +9,7 @@
         <div class="hero-cta">
           <a class="btn-main" href="#/workbench">开始安全检测 →</a>
           <button class="btn-ghost" :disabled="demoLoading" @click="loadDemo">
-            {{ demoLoading ? '载入中…' : '查看演示报告' }}</button>
+            {{ demoLoading ? '载入中…' : '查看示例报告' }}</button>
         </div>
       </div>
       <!-- 快捷入口卡排(智谱 Hero 模型入口卡) -->

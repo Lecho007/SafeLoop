@@ -1,12 +1,12 @@
 <template>
   <div>
-    <div class="sl-sec" v-html="secIcon + '　证据链回放' + (isDemo ? demoTag : '')"></div>
+    <div class="sl-sec" v-html="secIcon + '　证据链回放'"></div>
 
     <template v-if="isDemo">
       <div class="card" style="padding:16px 22px;margin-bottom:12px">
         <b>测试目标（全程固定不变）</b><br>{{ demo.goal }}</div>
-      <RunTerminal right="演示数据 · 非本次检测">
-        <template #head><span class="dot"></span>DEMO · {{ demo.category }} · {{ demo.steps.length }} 轮</template>
+      <RunTerminal>
+        <template #head><span class="dot"></span>{{ demo.category }} · {{ demo.steps.length }} 轮</template>
         <template v-for="s in demo.steps" :key="s.round">
           <div class="t-round"><span class="sg" :class="s.ok ? 'r' : (s.safety === 'Unsafe' ? 'a' : 'g')"></span>
             {{ demo.task_id }} · {{ stratZh(s.strategy) }} · 内容判定 {{ s.safety }}
@@ -74,11 +74,10 @@ import TextDialog from './TextDialog.vue'
 
 const store = useStore()
 const secIcon = icon('doc', 16)
-const demoTag = "　<span class='sl-pill'>演示数据</span>"
 const demo = DEMO
 const txDlg = ref(null)
 const emptyHtml = icon('doc', 30, 'stroke:#9db0c9') +
-  `<div class='t'>暂无轨迹数据</div><div class='h'>完成一次检测（或在总览页载入示例数据）后，` +
+  `<div class='t'>暂无轨迹数据</div><div class='h'>完成一次检测后，` +
   `<br>这里逐轮展示红方提问、模型回答与最终裁决。</div>`
 
 const isDemo = computed(() => !store.viewedRunId)

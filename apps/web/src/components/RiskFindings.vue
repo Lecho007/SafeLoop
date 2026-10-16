@@ -49,7 +49,7 @@ const props = defineProps({ report: Object, poolSteps: Array })
 const secIcon = icon('pulse', 16)
 const barIcon = icon('alert', 14)
 const emptyHtml = icon('pulse', 30, 'stroke:#9db0c9') +
-  `<div class='t'>暂无评估数据</div><div class='h'>完成一次检测（或载入示例数据）后，` +
+  `<div class='t'>暂无评估数据</div><div class='h'>完成一次检测后，` +
   `这里汇总风险发现比例、首次触发轮次与类别分布。</div>`
 const colors = ['#4d6bfe', '#0ea5e9', '#14b8a6', '#12a150', '#65a30d',
   '#d97706', '#ea8a2b', '#e5484d', '#a855f7', '#6366f1']

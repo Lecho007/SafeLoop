@@ -87,7 +87,7 @@ try {
 
   // ---- 演示报告(首页 CTA → 报告页) ----
   await goto('home')
-  await page.getByRole('button', { name: '查看演示报告' }).click()
+  await page.getByRole('button', { name: '查看示例报告' }).click()
   await page.waitForTimeout(2200)
   ok('演示 CTA 跳转报告页', (await page.locator('.grade-card').count()) === 1)
   ok('报告等级徽章卡', (await page.getByText('风险发现率').count()) >= 1)
