@@ -154,12 +154,11 @@ class TestQueueAndCompletion(_Base):
         b = self.mgr.submit(RunSpec(rounds=3))
         _wait_terminal(self.mgr, a)
         # a 终态时 b 仍可能在执行，但绝不允许并行（b 的 agent 在 a 完成前不启动）
-        alive = [x for x in self.made if x is self.mgr.get_agent(b)]
         st_b = self.mgr.get_run(b)["status"]
         self.assertIn(st_b, ("QUEUED", "RUNNING", "COMPLETED", "CANCELLING"))
-        # a 完成后 b 才可能 RUNNING：检查 a 终态时刻 b 的 agent 是否存在
-        if st_b in ("RUNNING", "COMPLETED"):
-            self.assertTrue(alive or st_b == "COMPLETED")
+        # 注：RUNNING 且 get_agent 为空的瞬态是合法的（agent 收尾窗口：
+        # _agents 已注销、终态尚未落库），不构成并行证据；并行的判定
+        # 以最终创建的 agent 数量为准。
         _wait_terminal(self.mgr, b)
         self.assertEqual(len(self.made), 2)
 

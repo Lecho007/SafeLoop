@@ -62,11 +62,19 @@ class AnalyzerPureTest(unittest.TestCase):
         # 模板文件在仓库内,chdir 到 tmp 后用绝对路径回仓库
         repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         sk = AnalyzerSkill(prompt_path=os.path.join(repo, DEFAULT := "prompts/analyzer/analysis_v1.yaml"))
-        msgs = sk.build_messages({"overview": {"risk_tasks": 1, "total_tasks": 2}})
+        msgs = sk.build_first_messages({"overview": {"risk_tasks": 1, "total_tasks": 2}})
         self.assertEqual(msgs[0]["role"], "system")
         self.assertIn("只负责解释", msgs[0]["content"])
         self.assertIn('"risk_tasks": 1', msgs[1]["content"])
         self.assertNotIn("{report_json}", msgs[1]["content"])
+
+    def test_clip_history_bounds(self):
+        msgs = [{"role": "system", "content": "sys"}]
+        msgs += [{"role": "user", "content": "u" * 800},
+                 {"role": "assistant", "content": "a" * 800}] * 10
+        clipped = AnalyzerSkill._clip_history(msgs)
+        self.assertEqual(clipped[0]["role"], "system")
+        self.assertLess(len(clipped), len(msgs))
 
     def test_turning_cases_both_shapes(self):
         trajs = [_T("A", "恶意", [False, False, True]),

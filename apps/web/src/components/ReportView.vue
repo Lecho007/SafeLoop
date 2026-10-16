@@ -71,31 +71,42 @@
         </div>
       </div>
 
-      <!-- AI 分析(本地 Qwen3-4B 解读;只解读不裁决) -->
-      <div class="card ai-card" style="padding:18px 24px;margin-top:12px">
+      <!-- AI 分析(对话式;本地 Qwen3-4B,只解读不裁决) -->
+      <div class="card ai-card" style="padding:16px 20px;margin-top:12px">
         <div class="ai-head">
           <span class="ai-badge">AI</span>
           <span style="font-size:15px;font-weight:700">AI 分析</span>
-          <span class="sl-meta">本地 Qwen3-4B 解读 · 仅供参考，评估结论以独立评审为准</span>
+          <span class="sl-meta">本地 Qwen3-4B · 仅供参考，评估结论以独立评审为准</span>
+          <span class="sp"></span>
+          <el-button v-if="chatMsgs.length" size="small" link
+            :disabled="aiLoading" @click="resetAi">重新开始</el-button>
         </div>
-        <template v-if="aiText">
-          <div class="ai-body">
-            <div v-for="(seg, i) in aiSegments" :key="i" class="ai-seg">
-              <div v-if="seg.title" class="ai-seg-t">{{ seg.title }}</div>
-              <div class="ai-seg-d">{{ seg.body }}</div>
+        <div class="chat-body" ref="chatBox">
+          <div v-if="!chatMsgs.length && !aiLoading" class="chat-empty">
+            <el-button size="small" type="primary" plain @click="genAi('')">
+              生成 AI 分析</el-button>
+            <span class="sl-meta">用本地语言模型解读这份报告，之后可以继续追问</span>
+          </div>
+          <template v-for="(m, i) in chatMsgs" :key="i">
+            <div v-if="m.role === 'assistant'" class="msg ai">
+              <span class="msg-ava">AI</span>
+              <div class="msg-bubble">{{ m.content }}</div>
             </div>
+            <div v-else-if="m.role === 'user'" class="msg me">
+              <div class="msg-bubble">{{ m.content }}</div>
+              <span class="msg-ava me-ava">我</span>
+            </div>
+          </template>
+          <div v-if="aiLoading" class="msg ai">
+            <span class="msg-ava">AI</span>
+            <div class="msg-bubble typing"><span class="d1"></span><span class="d2"></span><span class="d3"></span></div>
           </div>
-          <div class="ai-foot">
-            <span class="sl-meta">生成耗时 {{ aiMeta.elapsed_s }}s · {{ aiMeta.model }}</span>
-            <el-button size="small" :loading="aiLoading" @click="genAi">重新分析</el-button>
-          </div>
-        </template>
-        <div v-else-if="aiLoading" class="ai-wait">
-          本地模型分析中，约 10-40 秒，可以稍等…
         </div>
-        <div v-else style="display:flex;align-items:center;gap:12px">
-          <el-button size="small" type="primary" plain @click="genAi">生成 AI 分析</el-button>
-          <span class="sl-meta">用本地语言模型解读这份报告：风险集中域、攻击有效性与加固建议</span>
+        <div class="chat-input">
+          <el-input v-model="chatDraft" placeholder="向 AI 追问这份报告，回车发送…"
+            :disabled="aiLoading" @keyup.enter="sendAi" clearable />
+          <el-button type="primary" :loading="aiLoading" :disabled="!chatDraft.trim()"
+            @click="sendAi">发送</el-button>
         </div>
         <el-alert v-if="aiError" type="warning" :closable="false" :title="aiError"
           style="margin-top:8px" />
@@ -291,40 +302,60 @@ async function toggleReviewed(v) {
 function backToSelect() { store.clearViewed() }
 
 // ---- AI 分析(本地 Qwen3-4B;只解读不裁决)
-const aiText = ref('')
-const aiMeta = ref({})
+// ---- AI 对话式分析(本地 Qwen3-4B;只解读不裁决)
+const chatMsgs = ref([])      // [{role:'assistant'|'user', content}]
+const chatDraft = ref('')
 const aiLoading = ref(false)
 const aiError = ref('')
-const aiSegments = computed(() => {
-  const segs = []
-  for (const line of (aiText.value || '').split('\n')) {
-    const t = line.trim()
-    if (!t) continue
-    const m = t.match(/^【(.+?)】\s*(.*)$/s)
-    if (m) segs.push({ title: m[1], body: m[2].trim() })
-    else if (segs.length) segs[segs.length - 1].body += '\n' + t
-    else segs.push({ title: '', body: t })
-  }
-  return segs
-})
+const chatBox = ref(null)
+const scrollChat = () => setTimeout(() => {
+  const el = chatBox.value
+  if (el) el.scrollTop = el.scrollHeight
+}, 80)
 async function loadAiCache() {
-  aiText.value = ''; aiMeta.value = {}; aiError.value = ''
+  chatMsgs.value = []; chatDraft.value = ''; aiError.value = ''
   const id = store.viewedRunId
   if (!id) return
   try {
     const r = await api.getAnalysis(id)
-    if (r.available) { aiText.value = r.text; aiMeta.value = r }
+    if (r.available && Array.isArray(r.messages)) {
+      chatMsgs.value = r.messages.filter(m => m.role === 'user' || m.role === 'assistant')
+      scrollChat()
+    }
   } catch (e) { /* 无缓存静默 */ }
 }
-async function genAi() {
+async function genAi(message = '') {
   const id = store.viewedRunId
-  if (!id) return
+  if (!id || aiLoading.value) return
   aiLoading.value = true; aiError.value = ''
+  if (message) chatMsgs.value.push({ role: 'user', content: message })
+  chatDraft.value = ''
+  scrollChat()
   try {
-    const r = await api.analyzeReport(id)
-    aiText.value = r.text; aiMeta.value = r
+    const r = await api.analyzeReport(id, message)
+    chatMsgs.value = (r.messages || []).filter(m => m.role === 'user' || m.role === 'assistant')
+  } catch (e) {
+    aiError.value = 'AI 分析失败：' + e
+    if (message) chatMsgs.value.pop()   // 失败回滚本轮用户消息
+  }
+  aiLoading.value = false
+  scrollChat()
+}
+const sendAi = () => {
+  const t = chatDraft.value.trim()
+  if (t) genAi(t)
+}
+async function resetAi() {
+  const id = store.viewedRunId
+  if (!id || aiLoading.value) return
+  chatMsgs.value = []; aiError.value = ''
+  aiLoading.value = true
+  try {
+    const r = await api.analyzeReport(id, '', true)
+    chatMsgs.value = (r.messages || []).filter(m => m.role === 'user' || m.role === 'assistant')
   } catch (e) { aiError.value = 'AI 分析失败：' + e }
   aiLoading.value = false
+  scrollChat()
 }
 watch(() => store.viewedRunId, loadAiCache, { immediate: true })
 const modeZh = (m) => ({ standard: '标准', guided: '引导', compare: '对比' }[m] || m || '')

@@ -292,7 +292,7 @@ def _analyzer():
 
 @app.get("/evaluations/{run_id}/analysis")
 def get_analysis(run_id: str):
-    """读取已缓存的 AI 分析（未生成返回 available=false）。"""
+    """读取已缓存的 AI 对话历史(未生成返回 available=false)。"""
     from safeloop.skills.analyzer import AnalyzerSkill
     cached = AnalyzerSkill.load_cache(run_id)
     if not cached:
@@ -300,9 +300,16 @@ def get_analysis(run_id: str):
     return {"available": True, **cached}
 
 
+class AiChatRequest(BaseModel):
+    message: str = ""     # 空 = 生成首条分析;非空 = 基于报告上下文追问
+    reset: bool = False   # 丢弃缓存重新开始
+
+
 @app.post("/evaluations/{run_id}/analyze")
-def analyze_report(run_id: str):
-    """生成 AI 分析（本地推理,约 10-40s;同步返回并写缓存）。"""
+def analyze_report(run_id: str, req: AiChatRequest = None):
+    """AI 对话式分析(本地推理,首条约 15s、追问更快;同步返回并写缓存)。"""
+    message = (req.message or "") if req else ""
+    reset = bool(req.reset) if req else False
     agent, _ = _agent_or_load(run_id)
     report = agent.report
     if report is None:
@@ -312,8 +319,9 @@ def analyze_report(run_id: str):
         trajs.extend(agent.trajectories[name])
     from safeloop.skills.analyzer import AnalyzerError, extract_turning_cases
     try:
-        return _analyzer().analyze(run_id, report,
-                                   extract_turning_cases(trajs))
+        return _analyzer().chat(run_id, report,
+                                extract_turning_cases(trajs),
+                                message=message, reset=reset)
     except AnalyzerError as e:
         raise HTTPException(503, str(e))
 
