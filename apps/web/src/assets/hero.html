@@ -2,12 +2,12 @@
 .hd-svg text{font-family:"PingFang SC","Microsoft YaHei",sans-serif}
 /* 节点：无白底，透明 + 彩色描边（底色即图容器的玻璃色） */
 .hd-n{fill:rgba(255,255,255,.22);stroke:#9fb3d1;stroke-width:1.3}
-.hd-core{fill:rgba(47,111,235,.10);stroke:#2f6feb;stroke-width:1.8}
+.hd-core{fill:rgba(47,111,235,.10);stroke:#4d6bfe;stroke-width:1.8}
 .hd-t{font-size:14.5px;font-weight:600;fill:#172033}
 .hd-s{font-size:10.5px;fill:#67738a}
 /* 连线：端点精确贴节点边缘，左右严格镜像（对称轴 x=430） */
 .hd-e{fill:none;stroke:#c9d6e6;stroke-width:1.8}
-.hd-flow{fill:none;stroke:#2f6feb;stroke-width:2.6;stroke-linecap:round;
+.hd-flow{fill:none;stroke:#4d6bfe;stroke-width:2.6;stroke-linecap:round;
   stroke-dasharray:6 16;opacity:0;
   animation:hdflow 1.1s linear infinite, hdrelay 4.8s infinite}
 @keyframes hdflow{to{stroke-dashoffset:-22}}
@@ -15,11 +15,10 @@
   23%{opacity:0}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.hd-flow{animation:none;opacity:0}}
 </style>
-<!-- 图容器与外层玻璃卡同材质同参数（58% 白 + blur/saturate + 玻璃边线） -->
-<div style="background:rgba(255,255,255,.58);
-     backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);
-     border:1px solid rgba(255,255,255,.72);border-radius:14px;
-     box-shadow:0 8px 32px rgba(23,32,51,.08),inset 0 1px 0 rgba(255,255,255,.85);
+<!-- 图容器与外层白卡同材质(DeepSeek 式:白底+细边+浅阴影) -->
+<div style="background:#ffffff;
+     border:1px solid #e5e6eb;border-radius:12px;
+     box-shadow:0 2px 8px rgba(31,35,41,.04);
      padding:18px 14px 6px;margin:8px 0 10px">
 <svg viewBox="0 0 860 430" width="100%" class="hd-svg">
   <defs>
@@ -52,22 +51,22 @@
 
   <!-- ===== 节点 ===== -->
   <g><circle cx="430" cy="36" r="16" fill="rgba(47,111,235,.10)"
-     stroke="#2f6feb" stroke-width="1.6"/>
-    <text x="430" y="41" text-anchor="middle" style="font-size:12px;font-weight:700" fill="#2f6feb">用户</text></g>
+     stroke="#4d6bfe" stroke-width="1.6"/>
+    <text x="430" y="41" text-anchor="middle" style="font-size:12px;font-weight:700" fill="#4d6bfe">用户</text></g>
   <rect class="hd-n hd-core" x="320" y="98" width="220" height="52" rx="10"/>
-  <circle cx="341" cy="112" r="11" fill="#2f6feb"/><text x="341" y="116" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">核</text><text x="446" y="120" text-anchor="middle" class="hd-t">SafeLoop 主智能体</text>
+  <circle cx="341" cy="112" r="11" fill="#4d6bfe"/><text x="341" y="116" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">核</text><text x="446" y="120" text-anchor="middle" class="hd-t">SafeLoop 主智能体</text>
   <text x="446" y="138" text-anchor="middle" class="hd-s">需求理解，规划与调度</text>
-  <rect class="hd-n" x="90" y="202" width="180" height="52" rx="9" style="stroke:#e6465f"/>
-  <rect x="102" y="212" width="22" height="22" rx="5" fill="#e6465f"/><text x="113" y="227" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">红</text><text x="197" y="224" text-anchor="middle" class="hd-t">红方测试员</text>
+  <rect class="hd-n" x="90" y="202" width="180" height="52" rx="9" style="stroke:#e5484d"/>
+  <rect x="102" y="212" width="22" height="22" rx="5" fill="#e5484d"/><text x="113" y="227" text-anchor="middle" style="font-size:11px;font-weight:700" fill="#fff">红</text><text x="197" y="224" text-anchor="middle" class="hd-t">红方测试员</text>
   <text x="197" y="242" text-anchor="middle" class="hd-s">设计并逐轮调整测试问题</text>
-  <rect class="hd-n" x="340" y="202" width="180" height="52" rx="9" style="stroke:#2f6feb"/>
-  <path d="M356 214 l7 -4 7 4 v8 l-7 4 -7 -4 z" fill="#2f6feb" opacity=".9"/><text x="445" y="224" text-anchor="middle" class="hd-t">安全判别智能体</text>
+  <rect class="hd-n" x="340" y="202" width="180" height="52" rx="9" style="stroke:#4d6bfe"/>
+  <path d="M356 214 l7 -4 7 4 v8 l-7 4 -7 -4 z" fill="#4d6bfe" opacity=".9"/><text x="445" y="224" text-anchor="middle" class="hd-t">安全判别智能体</text>
   <text x="445" y="242" text-anchor="middle" class="hd-s">内容安全与目标推进双视角</text>
-  <rect class="hd-n" x="590" y="202" width="180" height="52" rx="9" style="stroke:#16875d"/>
-  <path d="M613 214 v14 M605 214 h16 M613 214 l-7 9 h14 z" stroke="#16875d" stroke-width="2" fill="none"/><text x="696" y="224" text-anchor="middle" class="hd-t">独立评审官</text>
+  <rect class="hd-n" x="590" y="202" width="180" height="52" rx="9" style="stroke:#12a150"/>
+  <path d="M613 214 v14 M605 214 h16 M613 214 l-7 9 h14 z" stroke="#12a150" stroke-width="2" fill="none"/><text x="696" y="224" text-anchor="middle" class="hd-t">独立评审官</text>
   <text x="696" y="242" text-anchor="middle" class="hd-s">不参与测试，只做最终裁决</text>
-  <rect class="hd-n" x="330" y="308" width="200" height="52" rx="9" style="stroke:#7556d8"/>
-  <rect x="342" y="316" width="22" height="16" rx="3" fill="#7556d8"/><text x="353" y="328" text-anchor="middle" style="font-size:10px;font-weight:700" fill="#fff">T</text><text x="447" y="330" text-anchor="middle" class="hd-t">被测大模型</text>
+  <rect class="hd-n" x="330" y="308" width="200" height="52" rx="9" style="stroke:#7c5cfc"/>
+  <rect x="342" y="316" width="22" height="16" rx="3" fill="#7c5cfc"/><text x="353" y="328" text-anchor="middle" style="font-size:10px;font-weight:700" fill="#fff">T</text><text x="447" y="330" text-anchor="middle" class="hd-t">被测大模型</text>
   <text x="447" y="348" text-anchor="middle" class="hd-s">本地模型或在线API黑盒</text>
   <rect x="90" y="386" width="680" height="30" rx="6" fill="rgba(255,255,255,.30)"
         stroke="#c9d6e6" stroke-dasharray="4 3"/>

@@ -22,10 +22,10 @@
 
         <template v-if="wizard.target === '本地模型'">
           <div class="sl-meta" style="line-height:2.15">
-            <div v-html="ic('cpu', 13, 'stroke:#2f6feb') + ' 被测模型　Phi-3.5-mini（NF4 量化）'"></div>
-            <div v-html="ic('play', 11, 'stroke:#7556d8') + ' 红方测试员　Qwen3-1.7B'"></div>
-            <div v-html="ic('pulse', 13, 'stroke:#b66a08') + ' 裁判　Qwen3Guard · 仅观察'"></div>
-            <div v-html="ic('shield', 13, 'stroke:#16875d') + ' 独立评审　StrongREJECT · 闭环之外'"></div>
+            <div v-html="ic('cpu', 13, 'stroke:#4d6bfe') + ' 被测模型　Phi-3.5-mini（NF4 量化）'"></div>
+            <div v-html="ic('play', 11, 'stroke:#7c5cfc') + ' 红方测试员　Qwen3-1.7B'"></div>
+            <div v-html="ic('pulse', 13, 'stroke:#d97706') + ' 裁判　Qwen3Guard · 仅观察'"></div>
+            <div v-html="ic('shield', 13, 'stroke:#12a150') + ' 独立评审　StrongREJECT · 闭环之外'"></div>
           </div>
         </template>
         <template v-else>
@@ -155,7 +155,7 @@
         <template v-if="store.activeAdaptiveQ">
           <span class="sl-meta" style="color:var(--live);font-weight:600">智能预算</span>
           <el-progress :percentage="adaptPct" :stroke-width="8" style="flex:1;max-width:280px"
-            :show-text="false" color="#7556d8" />
+            :show-text="false" color="#7c5cfc" />
           <span class="sl-meta">{{ store.run?.steps_done ?? 0 }}/{{ store.activeAdaptiveQ }} 次调用 · 调度器按风险覆盖分配轮次</span>
         </template>
         <span v-if="store.activeUseMemory" class="sl-meta" style="color:var(--live)">
@@ -213,10 +213,10 @@
           <div style="font-weight:700;margin-bottom:8px">智能体状态坞</div>
           <div class="card" style="padding:12px 16px">
             <div class="sl-meta" style="line-height:2.3">
-              <div v-html="ic('check', 13, 'stroke:#16875d') + ' 主智能体 · 已规划'"></div>
-              <div v-html="ic('play', 11, demoStep < demo.steps.length ? 'stroke:#7556d8' : 'stroke:#16875d') + ' 红方测试员'"></div>
-              <div v-html="ic('pulse', 13, 'stroke:#2f6feb') + ' 裁判 · 观察中'"></div>
-              <div v-html="ic('shield', 13, demoStep === demo.steps.length ? 'stroke:#16875d' : 'stroke:#9db0c9') + ' 独立评审官'"></div>
+              <div v-html="ic('check', 13, 'stroke:#12a150') + ' 主智能体 · 已规划'"></div>
+              <div v-html="ic('play', 11, demoStep < demo.steps.length ? 'stroke:#7c5cfc' : 'stroke:#12a150') + ' 红方测试员'"></div>
+              <div v-html="ic('pulse', 13, 'stroke:#4d6bfe') + ' 裁判 · 观察中'"></div>
+              <div v-html="ic('shield', 13, demoStep === demo.steps.length ? 'stroke:#12a150' : 'stroke:#9db0c9') + ' 独立评审官'"></div>
             </div>
           </div>
         </div>

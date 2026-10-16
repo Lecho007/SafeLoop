@@ -1,5 +1,5 @@
 // 决策路径树 SVG 生成器 —— 自 apps/workbench/components/tree_svg.py 1:1 移植
-const LENS = '#2f6feb', RISK = '#e6465f', WARN = '#b66a08', SAFE = '#16875d'
+const LENS = '#4d6bfe', RISK = '#e5484d', WARN = '#d97706', SAFE = '#12a150'
 const PANEL = '#ffffff', TRACE = '#dfe5ee'
 const SIGNAL_HEX = { risk: RISK, warn: WARN, safe: SAFE, null: '#9db0c4' }
 const ACTION_ZH = { KEEP: '保持', REFINE: '细化', SWITCH: '换策略', REALIGN: '回正', UNCERTAIN: '不确定' }
@@ -22,7 +22,7 @@ export function decisionPathTree(rounds, verdict = null, live = false,
     `<defs><filter id="dglow" x="-60%" y="-60%" width="220%" height="220%">
       <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="${LENS}"/></filter></defs>`,
     `<style>.dn{fill:${PANEL};stroke:${TRACE};stroke-width:1.5}
-.dn.done{fill:#eef5ff;stroke:${LENS};stroke-width:2}
+.dn.done{fill:#eef1ff;stroke:${LENS};stroke-width:2}
 .dt{font-size:13px;font-weight:600;fill:#172033}
 .ds{font-size:11px;fill:#67738a}
 .de{stroke:${'#c9d6e6'};stroke-width:2;fill:none}
@@ -41,7 +41,7 @@ animation:deflow 1s linear infinite;filter:drop-shadow(0 0 4px rgba(47,111,235,.
     if (progress != null) stroke = done ? sig : '#c9d6e6'
     const nodeCls = done ? ' class="dn done"' : ' class="dn"'
     parts.push(`<circle cx="${cx}" cy="70" r="30"${nodeCls}
-      fill="${done ? '#eef5ff' : PANEL}" stroke="${stroke}" stroke-width="2.4"/>`)
+      fill="${done ? '#eef1ff' : PANEL}" stroke="${stroke}" stroke-width="2.4"/>`)
     if (nd.signal) parts.push(`<circle cx="${cx}" cy="70" r="8" fill="${sig}"/>`)
     if (triggerRound && nd.round === triggerRound) {
       parts.push(`<circle cx="${cx}" cy="70" r="36" fill="none" stroke="${RISK}"
