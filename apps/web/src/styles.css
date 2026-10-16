@@ -476,11 +476,13 @@ body {
 .ai-badge { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
   background: linear-gradient(135deg, #4d6bfe, #7c5cfc); color: #fff;
   font-size: 12px; font-weight: 700; letter-spacing: .5px; flex: none; }
-.chat-body { max-height: 380px; overflow-y: auto; display: flex;
-  flex-direction: column; gap: 12px; padding: 4px 2px 8px; }
+/* 固定高度滚动聊天区:消息少时高度稳定,多时内部滚动 */
+.chat-body { height: 380px; overflow-y: auto; display: flex;
+  flex-direction: column; gap: 12px; padding: 8px 2px;
+  background: #fafbfd; border: 1px solid #f0f2f7; border-radius: 10px; }
 .chat-body::-webkit-scrollbar { width: 6px; }
 .chat-body::-webkit-scrollbar-thumb { background: #dfe3ec; border-radius: 3px; }
-.chat-empty { display: flex; align-items: center; gap: 12px; padding: 18px 4px; }
+.chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; }
 .msg { display: flex; align-items: flex-start; gap: 10px; }
 .msg.me { justify-content: flex-end; }
 .msg-ava { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
