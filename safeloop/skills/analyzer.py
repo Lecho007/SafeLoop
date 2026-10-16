@@ -76,7 +76,7 @@ class AnalyzerSkill:
 
     def __init__(self, model_path: str = DEFAULT_MODEL_PATH,
                  prompt_path: str = DEFAULT_PROMPT,
-                 max_new_tokens: int = 800,
+                 max_new_tokens: int = 1200,
                  device: str = "cuda") -> None:
         self.model_path = model_path
         self.prompt_path = prompt_path
