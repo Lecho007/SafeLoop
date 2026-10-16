@@ -34,8 +34,7 @@
       </div>
       <div class="chat-body" ref="chatBox">
         <div v-if="!chatMsgs.length && !aiLoading" class="chat-empty">
-          <el-button size="small" type="primary" plain @click="genAi('')">
-            {{ report ? '生成 AI 分析' : '生成示例报告的 AI 分析' }}</el-button>
+          <span class="sl-meta">查看任意一份报告后，AI 将自动开始分析</span>
         </div>
         <template v-for="(m, i) in chatMsgs" :key="i">
           <div v-if="m.role === 'assistant'" class="msg ai">
@@ -312,15 +311,14 @@ async function loadAiCache() {
     if (r.available && Array.isArray(r.messages)) {
       chatMsgs.value = r.messages.filter(m => m.role === 'user' || m.role === 'assistant')
       scrollChat()
+      return
     }
-  } catch (e) { /* 无缓存静默 */ }
+  } catch (e) { /* 查询失败按无缓存处理 */ }
+  // 无缓存:查看报告即自动开始 AI 分析(用户无需再点任何按钮)
+  genAi('')
 }
 async function genAi(message = '') {
-  let id = store.viewedRunId
-  if (!id && !message) {          // 空态点"生成":自动载入默认演示再分析
-    try { await loadDemo(demos[0].id) } catch (e) { ElMessage.error('载入失败：' + e) }
-    id = store.viewedRunId
-  }
+  const id = store.viewedRunId
   if (!id || aiLoading.value) return
   aiLoading.value = true; aiError.value = ''
   if (message) chatMsgs.value.push({ role: 'user', content: message })
