@@ -1,22 +1,30 @@
 <template>
   <div>
     <div class="sl-sec" v-html="secIcon + '　评估报告'"></div>
-    <div v-if="!report" class="glass sl-empty" v-html="emptyHtml"></div>
 
-    <!-- 空态:演示报告选择(多点内容,不再空荡) -->
+    <!-- 空态:轻提示 + 演示报告预览(带关键数字,内容充实不空荡) -->
     <div v-if="!report" class="demo-rpts">
-      <div class="dr-head">或者,先看几份演示报告
-        <span class="sl-meta">(历史真实运行的数据,秒级载入)</span></div>
+      <div class="dr-hero">
+        <div class="drh-t">还没有正在查看的报告</div>
+        <div class="drh-d">完成一次检测后会自动展示在这里;也可以先点开下面任意一份演示报告——
+          都是历史真实运行的数据,秒级载入、可随意切换。</div>
+      </div>
       <div class="dr-grid">
-        <div v-for="d in demos" :key="d.id" class="dr-card" :class="d.tone">
+        <div v-for="d in demos" :key="d.id" class="dr-card tone-x" :class="d.tone">
           <span class="dr-badge">{{ d.badge }}</span>
           <div class="dr-t">{{ d.t }}</div>
+          <div class="dr-kpi">
+            <div class="dk-v" :class="d.rateCls">{{ d.rate }}</div>
+            <div class="dk-k">风险发现率<br/><b>{{ d.risk }}/{{ d.total }}</b> 场景确认</div>
+          </div>
           <div class="dr-d">{{ d.d }}</div>
           <div class="dr-meta">{{ d.meta }}</div>
           <el-button size="small" type="primary" plain :loading="loading === d.id"
             @click="loadDemo(d.id)">查看这份报告</el-button>
         </div>
       </div>
+      <div class="dr-tip">看完演示想上手?去 <a href="#/workbench">检测工作台</a> 发起一次真实检测,
+        或回 <a href="#/home">首页</a> 了解平台能力。</div>
     </div>
 
     <template v-else>
@@ -101,28 +109,29 @@ const store = useStore()
 const secIcon = icon('doc', 16)
 const dlIcon = icon('download', 13)
 const docIcon = icon('doc', 13)
-const emptyHtml = icon('doc', 30, 'stroke:#9db0c9') +
-  `<div class='t'>暂无评估数据</div><div class='h'>完成一次检测后，这里给出总体结论、` +
-  `适用范围与研究指标（专家模式）。</div>`
 
 // ---- 演示报告(空态展示;均为历史真实运行数据,零 GPU 秒级载入)
 const loading = ref('')
 const demos = [
   { id: 'stage1b_r_4060', badge: '对比检测', tone: 'tone-blue',
     t: '标准 vs 智能引导 · 全量 100 场景',
+    rate: '38%', risk: '38', total: '100', rateCls: 'red',
     d: '两支并行对比引导是否有效,JBB-100 全量任务集,含完整轨迹与对比结论',
     meta: '英文基准 · 100 场景 · 5 轮' },
   { id: 'stage1b_a_4060', badge: '标准检测', tone: 'tone-green',
     t: '内容域反馈验证 · 70 场景',
+    rate: '36%', risk: '25', total: '70', rateCls: 'red',
     d: '内容可观测子集上,无反馈与结构化反馈两条件的完整证据链',
     meta: '英文基准 · 70 场景 · 5 轮' },
   { id: 'stage1b_b_4060', badge: '消融系列', tone: 'tone-purple',
     t: '多信号判别消融 · 30 场景',
+    rate: '37%', risk: '11', total: '30', rateCls: 'red',
     d: '目标合规域上五种判别条件的对照运行,适合研究对照查看',
     meta: '英文基准 · 30 场景 · 5 轮' },
   { id: 'run-8d1aa38232', badge: '黑盒 API', tone: 'tone-orange',
     t: 'DeepSeek 在线检测 · 3 场景',
-    d: '在线 API 黑盒目标的真实运行样例,展示远程模型检测的完整流程',
+    rate: '0%', risk: '0', total: '3', rateCls: 'green',
+    d: '在线 API 黑盒目标的真实运行样例:3 个合规域场景全部抵御',
     meta: '中文场景 · 3 场景 · 引导模式' },
 ]
 

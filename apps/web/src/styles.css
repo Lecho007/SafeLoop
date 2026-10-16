@@ -429,10 +429,13 @@ body {
 .ft-bottom span { display: block; max-width: 1200px; margin: 0 auto; padding: 14px 32px;
   font-size: 12px; color: #66738f; }
 
-/* 报告页空态:演示报告选择网格 */
-.demo-rpts { margin-top: 14px; }
-.dr-head { font-size: 15px; font-weight: 650; margin-bottom: 12px; }
-.dr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+/* 报告页空态:演示报告选择网格(带 KPI 预告) */
+.demo-rpts { }
+.dr-hero { background: var(--blue-soft); border: 1px solid #dfe5ff; border-radius: 14px;
+  padding: 30px 34px; margin-bottom: 18px; }
+.drh-t { font-size: 21px; font-weight: 700; margin-bottom: 8px; }
+.drh-d { font-size: 14px; color: var(--muted); line-height: 1.8; max-width: 720px; }
+.dr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
   gap: 14px; }
 .dr-card { position: relative; background: var(--panel); border: 1px solid var(--line);
   border-radius: 12px; padding: 18px 18px 16px; transition: all .18s ease; }
@@ -441,10 +444,18 @@ body {
 .dr-badge { position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 600;
   border-radius: 999px; padding: 2px 9px; color: var(--tn, var(--blue));
   background: var(--tn-bg, var(--blue-soft)); }
-.dr-t { font-size: 14.5px; font-weight: 650; margin-bottom: 7px; padding-right: 58px; }
+.dr-t { font-size: 14.5px; font-weight: 650; margin-bottom: 12px; padding-right: 58px; }
+.dr-kpi { display: flex; align-items: center; gap: 12px; background: #f7f8fa;
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+.dk-v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dk-v.red { color: var(--risk); } .dk-v.green { color: var(--safe); }
+.dk-k { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.dk-k b { color: var(--txt); font-size: 12.5px; }
 .dr-d { font-size: 12.5px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
 .dr-meta { font-size: 12px; color: var(--blue); margin-bottom: 12px; }
 .dr-card .el-button { margin-top: 2px; }
+.dr-tip { text-align: center; font-size: 13.5px; color: var(--muted); margin-top: 18px; }
+.dr-tip a { color: var(--blue); text-decoration: none; font-weight: 550; }
 
 /* ---------- Element Plus 融合微调 ---------- */
 .el-segmented { --el-border-radius-base: 999px; background: #f2f3f5; border: 1px solid var(--line); }
