@@ -1,12 +1,15 @@
 <template>
-  <div class="wrap">
-    <SiteHeader />
-    <HomeView v-show="route === 'home'" />
-    <ProductView v-show="route === 'product'" />
-    <Overview v-show="route === 'workbench'" />
-    <ReplayView v-show="route === 'replay'" />
-    <ReportView v-show="route === 'report'" />
-    <DocsView v-show="route === 'docs'" />
+  <div>
+    <div class="wrap">
+      <SiteHeader />
+      <HomeView v-show="route === 'home'" />
+      <ProductView v-show="route === 'product'" />
+      <Overview v-show="route === 'workbench'" />
+      <ReplayView v-show="route === 'replay'" />
+      <ReportView v-show="route === 'report'" />
+      <DocsView v-show="route === 'docs'" />
+    </div>
+    <SiteFooter />
   </div>
 </template>
 
@@ -15,6 +18,7 @@ import { onMounted } from 'vue'
 import { useStore } from './store.js'
 import { useRoute } from './router.js'
 import SiteHeader from './components/SiteHeader.vue'
+import SiteFooter from './components/SiteFooter.vue'
 import HomeView from './components/HomeView.vue'
 import ProductView from './components/ProductView.vue'
 import DocsView from './components/DocsView.vue'

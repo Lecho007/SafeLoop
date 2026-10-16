@@ -41,7 +41,12 @@ try {
   ok('通栏导航', (await page.locator('.site-hd .nav a').count()) === 6)
   ok('Hero 大标题', (await page.locator('.hero h1').count()) === 1
     && (await page.locator('.hero h1').innerText()).includes('替你测试'))
-  ok('能力卡片网格', (await page.locator('.cap-card').count()) >= 6)
+  ok('Hero 快捷入口卡排', (await page.locator('.hq-card').count()) === 4)
+  ok('能力卡片网格(8张4列小卡)', (await page.locator('.cap-card').count()) === 8)
+  ok('能力卡彩色标签', (await page.locator('.cc-tag').count()) >= 4)
+  ok('四步流程浅灰区块', (await page.locator('.sf-item').count()) === 4)
+  ok('数据亮点行', (await page.locator('.num-item').count()) === 4)
+  ok('深色页脚', (await page.locator('.site-ft .ft-col').count()) === 4)
   ok('底部 CTA（首页/产品页共用组件）', (await page.locator('.cta-band').count()) >= 1)
 
   // ---- 产品介绍页 ----
