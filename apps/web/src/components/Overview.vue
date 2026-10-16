@@ -1,15 +1,10 @@
 <template>
   <div>
-    <!-- 系统架构 -->
-    <el-collapse v-model="archOpen" class="glass arch">
-      <el-collapse-item name="arch" title="系统架构">
-        <div class="sl-meta" style="margin-bottom:8px">
-          四阶段闭环：红方生成 → 被测模型回答 → 裁判观察 → 反馈适应；
-          独立评审官永远在闭环之外，只在结束后做最终裁决。
-        </div>
-        <div v-html="hero"></div>
-      </el-collapse-item>
-    </el-collapse>
+    <!-- 工作台页头 -->
+    <div class="wb-hero">
+      <h1>检测工作台</h1>
+      <p>接入模型 · 选择范围 · 拿到报告；运行期间可自由浏览与离开，进度不丢</p>
+    </div>
 
     <!-- 双卡表单 -->
     <div class="grid2">
@@ -239,7 +234,6 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import hero from '../assets/hero.html?raw'
 import { api } from '../api.js'
 import { icon } from '../icons.js'
 import { useStore } from '../store.js'
@@ -258,7 +252,6 @@ const targetIcon = icon('target', 16)
 const termIcon = icon('terminal', 15)
 const treeIcon = icon('tree', 15)
 
-const archOpen = ref(['arch'])
 const demo = DEMO
 const demoRounds = DEMO_ROUNDS
 const demoStep = ref(demo.steps.length)
