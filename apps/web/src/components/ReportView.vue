@@ -309,7 +309,7 @@ async function loadAiCache() {
   try {
     const r = await api.getAnalysis(id)
     if (r.available && Array.isArray(r.messages)) {
-      chatMsgs.value = r.messages.filter(m => m.role === 'user' || m.role === 'assistant')
+      chatMsgs.value = r.messages.filter(m => (m.role === 'user' || m.role === 'assistant') && !m.content.startsWith('评估报告数据如下'))
       scrollChat()
       return
     }
@@ -326,7 +326,7 @@ async function genAi(message = '') {
   scrollChat()
   try {
     const r = await api.analyzeReport(id, message)
-    chatMsgs.value = (r.messages || []).filter(m => m.role === 'user' || m.role === 'assistant')
+    chatMsgs.value = (r.messages || []).filter(m => (m.role === 'user' || m.role === 'assistant') && !m.content.startsWith('评估报告数据如下'))
   } catch (e) {
     aiError.value = 'AI 分析失败：' + e
     if (message) chatMsgs.value.pop()   // 失败回滚本轮用户消息
@@ -345,7 +345,7 @@ async function resetAi() {
   aiLoading.value = true
   try {
     const r = await api.analyzeReport(id, '', true)
-    chatMsgs.value = (r.messages || []).filter(m => m.role === 'user' || m.role === 'assistant')
+    chatMsgs.value = (r.messages || []).filter(m => (m.role === 'user' || m.role === 'assistant') && !m.content.startsWith('评估报告数据如下'))
   } catch (e) { aiError.value = 'AI 分析失败：' + e }
   aiLoading.value = false
   scrollChat()
