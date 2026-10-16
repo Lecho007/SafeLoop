@@ -70,6 +70,36 @@
           安全判别信号「可观察」不等于「应该干预」。</span>
         </div>
       </div>
+
+      <!-- AI 分析(本地 Qwen3-4B 解读;只解读不裁决) -->
+      <div class="card ai-card" style="padding:18px 24px;margin-top:12px">
+        <div class="ai-head">
+          <span class="ai-badge">AI</span>
+          <span style="font-size:15px;font-weight:700">AI 分析</span>
+          <span class="sl-meta">本地 Qwen3-4B 解读 · 仅供参考，评估结论以独立评审为准</span>
+        </div>
+        <template v-if="aiText">
+          <div class="ai-body">
+            <div v-for="(seg, i) in aiSegments" :key="i" class="ai-seg">
+              <div v-if="seg.title" class="ai-seg-t">{{ seg.title }}</div>
+              <div class="ai-seg-d">{{ seg.body }}</div>
+            </div>
+          </div>
+          <div class="ai-foot">
+            <span class="sl-meta">生成耗时 {{ aiMeta.elapsed_s }}s · {{ aiMeta.model }}</span>
+            <el-button size="small" :loading="aiLoading" @click="genAi">重新分析</el-button>
+          </div>
+        </template>
+        <div v-else-if="aiLoading" class="ai-wait">
+          本地模型分析中，约 10-40 秒，可以稍等…
+        </div>
+        <div v-else style="display:flex;align-items:center;gap:12px">
+          <el-button size="small" type="primary" plain @click="genAi">生成 AI 分析</el-button>
+          <span class="sl-meta">用本地语言模型解读这份报告：风险集中域、攻击有效性与加固建议</span>
+        </div>
+        <el-alert v-if="aiError" type="warning" :closable="false" :title="aiError"
+          style="margin-top:8px" />
+      </div>
       <div v-if="report.adaptive" class="card" style="padding:16px 24px;margin-top:12px">
         <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--live)">
           ◈ 智能预算摘要</div>
@@ -259,6 +289,44 @@ async function toggleReviewed(v) {
 
 // ---- 返回选择态 / 历史报告
 function backToSelect() { store.clearViewed() }
+
+// ---- AI 分析(本地 Qwen3-4B;只解读不裁决)
+const aiText = ref('')
+const aiMeta = ref({})
+const aiLoading = ref(false)
+const aiError = ref('')
+const aiSegments = computed(() => {
+  const segs = []
+  for (const line of (aiText.value || '').split('\n')) {
+    const t = line.trim()
+    if (!t) continue
+    const m = t.match(/^【(.+?)】\s*(.*)$/s)
+    if (m) segs.push({ title: m[1], body: m[2].trim() })
+    else if (segs.length) segs[segs.length - 1].body += '\n' + t
+    else segs.push({ title: '', body: t })
+  }
+  return segs
+})
+async function loadAiCache() {
+  aiText.value = ''; aiMeta.value = {}; aiError.value = ''
+  const id = store.viewedRunId
+  if (!id) return
+  try {
+    const r = await api.getAnalysis(id)
+    if (r.available) { aiText.value = r.text; aiMeta.value = r }
+  } catch (e) { /* 无缓存静默 */ }
+}
+async function genAi() {
+  const id = store.viewedRunId
+  if (!id) return
+  aiLoading.value = true; aiError.value = ''
+  try {
+    const r = await api.analyzeReport(id)
+    aiText.value = r.text; aiMeta.value = r
+  } catch (e) { aiError.value = 'AI 分析失败：' + e }
+  aiLoading.value = false
+}
+watch(() => store.viewedRunId, loadAiCache, { immediate: true })
 const modeZh = (m) => ({ standard: '标准', guided: '引导', compare: '对比' }[m] || m || '')
 const histRows = ref([])
 async function loadHist() {

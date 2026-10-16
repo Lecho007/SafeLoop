@@ -57,4 +57,6 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reviewed }),
   }),
+  getAnalysis: (id) => j(`/evaluations/${id}/analysis`),
+  analyzeReport: (id) => j(`/evaluations/${id}/analyze`, { method: 'POST' }),
 }

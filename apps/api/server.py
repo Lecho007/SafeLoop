@@ -10,6 +10,7 @@
 import json
 import os
 import sys
+import threading
 from typing import Dict, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
@@ -273,6 +274,48 @@ def set_reviewed(run_id: str, req: ReviewedRequest):
         raise HTTPException(404, "unknown run: {}".format(run_id))
     mgr.set_reviewed(run_id, req.reviewed)
     return {"run_id": run_id, "reviewed": req.reviewed}
+
+
+# ---------------- AI 报告分析（本地 Qwen3-4B·NF4；只解读不裁决，红线 1）---------
+_ANAnalyzer = None
+_AN_LOCK = threading.Lock()
+
+
+def _analyzer():
+    global _ANAnalyzer
+    with _AN_LOCK:
+        if _ANAnalyzer is None:
+            from safeloop.skills.analyzer import AnalyzerSkill
+            _ANAnalyzer = AnalyzerSkill()
+        return _ANAnalyzer
+
+
+@app.get("/evaluations/{run_id}/analysis")
+def get_analysis(run_id: str):
+    """读取已缓存的 AI 分析（未生成返回 available=false）。"""
+    from safeloop.skills.analyzer import AnalyzerSkill
+    cached = AnalyzerSkill.load_cache(run_id)
+    if not cached:
+        return {"available": False}
+    return {"available": True, **cached}
+
+
+@app.post("/evaluations/{run_id}/analyze")
+def analyze_report(run_id: str):
+    """生成 AI 分析（本地推理,约 10-40s;同步返回并写缓存）。"""
+    agent, _ = _agent_or_load(run_id)
+    report = agent.report
+    if report is None:
+        raise HTTPException(404, "report not ready for run: {}".format(run_id))
+    trajs = []
+    for name in agent.trajectories:
+        trajs.extend(agent.trajectories[name])
+    from safeloop.skills.analyzer import AnalyzerError, extract_turning_cases
+    try:
+        return _analyzer().analyze(run_id, report,
+                                   extract_turning_cases(trajs))
+    except AnalyzerError as e:
+        raise HTTPException(503, str(e))
 
 
 class ConnectionTestRequest(BaseModel):
