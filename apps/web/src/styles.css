@@ -19,7 +19,7 @@ body {
   min-height: 100vh;
 }
 #app { position: relative; z-index: 1; }
-.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 28px 60px; }
+.wrap { width: 100%; margin: 0 auto; padding: 20px 32px 60px; }
 
 /* ---------- 白卡(主体容器语言) ---------- */
 .glass, .card {
@@ -192,8 +192,8 @@ body {
 /* 通栏导航 */
 .site-hd { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .86);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line); margin: 0 -24px 20px; padding: 0 24px; }
-.site-hd-in { max-width: 1320px; margin: 0 auto; display: flex; align-items: center; gap: 22px;
+  border-bottom: 1px solid var(--line); margin: -20px -32px 22px; padding: 0 32px; }
+.site-hd-in { width: 100%; margin: 0 auto; display: flex; align-items: center; gap: 22px;
   height: 60px; }
 .site-hd .brand { display: flex; align-items: center; gap: 10px; text-decoration: none;
   color: var(--txt); }
@@ -218,8 +218,8 @@ body {
   box-shadow: 0 4px 12px rgba(77, 107, 254, .25); transition: background .15s ease; }
 .site-hd .cta:hover { background: var(--blue-deep); }
 
-/* 首页 Hero(智谱式深色:深蓝黑渐变 + 光斑 + 网格) */
-.hero { border-radius: 16px; overflow: hidden; margin-bottom: 34px; position: relative;
+/* 首页 Hero(智谱式通栏:深蓝黑渐变 + 光斑 + 网格,出血到屏幕边缘) */
+.hero { margin: 0 -32px 40px; border-radius: 0; position: relative;
   background:
     radial-gradient(44rem 22rem at 18% -10%, rgba(77, 107, 254, .34), transparent 62%),
     radial-gradient(36rem 20rem at 86% 8%, rgba(124, 92, 252, .22), transparent 60%),
@@ -227,8 +227,8 @@ body {
     linear-gradient(90deg, rgba(94, 234, 212, .035) 1px, transparent 1px),
     linear-gradient(160deg, #101731, #0b1122 62%);
   background-size: auto, auto, 30px 30px, 30px 30px, auto;
-  color: #fff; text-align: center; padding: 74px 32px 64px; }
-.hero-in { max-width: 760px; margin: 0 auto; }
+  color: #fff; text-align: center; padding: 84px 32px 68px; }
+.hero-in { max-width: 900px; margin: 0 auto; }
 .hero-tag { display: inline-block; font-size: 12.5px; letter-spacing: 1px; color: #aab8ff;
   border: 1px solid rgba(124, 143, 255, .38); background: rgba(77, 107, 254, .12);
   border-radius: 999px; padding: 4px 14px; margin-bottom: 22px; }
@@ -267,7 +267,8 @@ body {
 .cap-head h2 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
 .cap-head p { color: var(--muted); font-size: 14.5px; margin: 0; }
 .cap-more { color: var(--blue); text-decoration: none; font-weight: 500; }
-.cap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 40px; }
+.cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px; margin-bottom: 44px; }
 .cap-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 22px 22px 20px; text-decoration: none; color: var(--txt); display: block;
   transition: all .18s ease; box-shadow: 0 2px 8px rgba(31, 35, 41, .04); }
@@ -287,8 +288,8 @@ body {
 .cap-card.tone-x:hover, .role-card.tone-x:hover { border-color: var(--tn-line);
   box-shadow: 0 10px 26px var(--tn-shadow); }
 
-/* 底部 CTA 带 */
-.cta-band { border-radius: 16px; margin-top: 8px; padding: 34px 36px;
+/* 底部 CTA 带(通栏出血) */
+.cta-band { margin: 8px -32px 0; border-radius: 0; padding: 36px 48px;
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
   background:
     radial-gradient(30rem 14rem at 88% -30%, rgba(124, 92, 252, .28), transparent 60%),
@@ -308,7 +309,7 @@ body {
 .pp-sec { margin-bottom: 38px; }
 
 /* 角色卡 / 模式卡 / 红线 */
-.role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
 .role-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 20px; transition: all .18s ease; }
 .rc-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
@@ -316,12 +317,12 @@ body {
 .rc-t { font-size: 15px; font-weight: 650; }
 .rc-m { font-size: 12px; color: var(--blue); margin: 3px 0 8px; font-weight: 500; }
 .rc-d { font-size: 12.5px; color: var(--muted); line-height: 1.75; }
-.mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.mode-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .mode-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 20px; }
 .mc-t { font-size: 15px; font-weight: 650; margin-bottom: 8px; }
 .mc-d { font-size: 13px; color: var(--muted); line-height: 1.75; }
-.rule-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.rule-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
 .rule { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 18px 20px; display: flex; gap: 14px; }
 .ru-n { width: 28px; height: 28px; border-radius: 8px; background: var(--blue); color: #fff;
@@ -330,7 +331,7 @@ body {
 .ru-d { font-size: 12.5px; color: var(--muted); line-height: 1.75; }
 
 /* 文档页 */
-.doc-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 10px; }
+.doc-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-bottom: 10px; }
 .ds { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
 .ds-n { font-size: 22px; font-weight: 700; color: #d4dbff; margin-bottom: 8px; }
 .ds-t { font-size: 15px; font-weight: 650; margin-bottom: 6px; }
@@ -353,7 +354,6 @@ body {
   color: var(--blue-deep); word-break: break-all; }
 
 @media (max-width: 980px) {
-  .cap-grid, .role-grid, .doc-steps, .mode-grid, .rule-list { grid-template-columns: 1fr 1fr; }
   .site-hd .nav { display: none; }
   .hero h1 { font-size: 33px; }
 }
