@@ -70,6 +70,13 @@ try {
   })
   ok('指定场景类别加载', catVal.length > 0, catVal || '空')
 
+  // ---- 报告页空态:演示报告选择 ----
+  await goto('report')
+  ok('报告空态演示卡(4份)', (await page.locator('.dr-card').count()) === 4)
+  await page.locator('.dr-card').first().getByRole('button', { name: '查看这份报告' }).click()
+  await page.waitForTimeout(2000)
+  ok('演示卡载入出报告', (await page.locator('.grade-card').count()) === 1)
+
   // ---- 演示报告(首页 CTA → 报告页) ----
   await goto('home')
   await page.getByRole('button', { name: '查看演示报告' }).click()

@@ -429,6 +429,23 @@ body {
 .ft-bottom span { display: block; max-width: 1200px; margin: 0 auto; padding: 14px 32px;
   font-size: 12px; color: #66738f; }
 
+/* 报告页空态:演示报告选择网格 */
+.demo-rpts { margin-top: 14px; }
+.dr-head { font-size: 15px; font-weight: 650; margin-bottom: 12px; }
+.dr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  gap: 14px; }
+.dr-card { position: relative; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 18px 18px 16px; transition: all .18s ease; }
+.dr-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px var(--tn-shadow, rgba(31,35,41,.08));
+  border-color: var(--tn-line, #c9d4ff); }
+.dr-badge { position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 600;
+  border-radius: 999px; padding: 2px 9px; color: var(--tn, var(--blue));
+  background: var(--tn-bg, var(--blue-soft)); }
+.dr-t { font-size: 14.5px; font-weight: 650; margin-bottom: 7px; padding-right: 58px; }
+.dr-d { font-size: 12.5px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
+.dr-meta { font-size: 12px; color: var(--blue); margin-bottom: 12px; }
+.dr-card .el-button { margin-top: 2px; }
+
 /* ---------- Element Plus 融合微调 ---------- */
 .el-segmented { --el-border-radius-base: 999px; background: #f2f3f5; border: 1px solid var(--line); }
 /* 选中滑块改白色浮起块（EP 默认被主题色染成蓝块，蓝底蓝字导致选中项文字不可见） */
@@ -458,6 +475,12 @@ body {
 .el-button--primary { background: var(--blue); border-color: var(--blue);
   box-shadow: 0 4px 12px rgba(77, 107, 254, .22); font-weight: 600; }
 .el-button--primary:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
+/* plain 变体恢复浅底蓝字(全局实心样式会把它染成蓝底蓝字导致文字不可见) */
+.el-button--primary.is-plain { background: var(--blue-soft); color: var(--blue);
+  border-color: #c9d4ff; box-shadow: none; font-weight: 600; }
+.el-button--primary.is-plain:hover { background: #e0e7ff; color: var(--blue-deep);
+  border-color: var(--blue); }
+.el-button--warning.is-plain { box-shadow: none; }
 .el-tabs__item { font-weight: 600; color: var(--muted); }
 .el-tabs__item.is-active { color: var(--blue); }
 .el-tabs__active-bar { background: var(--blue); height: 3px; border-radius: 3px; }

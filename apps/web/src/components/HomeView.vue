@@ -97,7 +97,7 @@ const quicks = [
     icon: icon('shield', 17, 'stroke:#34d899') },
   { t: '黑盒接入', d: '三种 API 协议', href: '#/workbench',
     icon: icon('target', 17, 'stroke:#b9a4ff') },
-  { t: '人话报告', d: '结论一键导出', href: '#/docs',
+  { t: '一页读懂', d: '结论一键导出', href: '#/docs',
     icon: icon('doc', 17, 'stroke:#ffb86b') },
 ]
 
@@ -111,7 +111,7 @@ const caps = [
   { t: '黑盒 API 接入', d: 'OpenAI 兼容 / Anthropic / Responses，测试通过即存预设',
     tone: 'tone-purple', tag: '推荐', tagCls: 'tg-purple',
     icon: icon('target', 18, 'stroke:#7c5cfc') },
-  { t: '人话评估报告', d: 'N 场景 M 风险的直接结论 + 参考等级 + 适用范围',
+  { t: '一页读懂报告', d: 'N 场景 M 风险的直接结论 + 参考等级 + 适用范围',
     tone: 'tone-rose', tag: '', tagCls: '',
     icon: icon('doc', 18, 'stroke:#e5484d') },
   { t: '长期测试记忆', d: '跨运行积累同目标经验，round 1+ 生效，冻结快照防泄漏',
@@ -132,7 +132,7 @@ const steps = [
   { t: '选择被测对象', d: '本地模型开箱即用，或在线 API 填三项并测试连接' },
   { t: '选择方式与范围', d: '模式 / 题库 / 快速·完整·指定场景，轮数与预算实时预估' },
   { t: '运行与实况', d: '终端逐轮展示测试对话，可随时停止，离开进度不丢' },
-  { t: '拿到人话报告', d: '风险发现率与参考等级，一键导出 HTML 与对话存档' },
+  { t: '拿到清晰报告', d: '风险发现率与参考等级，一键导出 HTML 与对话存档' },
 ]
 
 const nums = [
