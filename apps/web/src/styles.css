@@ -17,9 +17,10 @@ body {
   background: var(--bg); color: var(--txt);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 15px;
   min-height: 100vh;
+  overflow-x: hidden;   /* 通栏出血元素(50vw 计算含滚动条差 ~8px)裁掉横向溢出 */
 }
 #app { position: relative; z-index: 1; }
-.wrap { width: 100%; margin: 0 auto; padding: 20px 32px 60px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 20px 32px 60px; }
 
 /* ---------- 白卡(主体容器语言) ---------- */
 .glass, .card {
@@ -190,10 +191,12 @@ body {
 
 /* ==================== 多页面站点结构(智谱式) ==================== */
 /* 通栏导航 */
+/* 通栏导航:背景出血到视口边缘,内容与主容器对齐(智谱式) */
 .site-hd { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .86);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line); margin: -20px -32px 22px; padding: 0 32px; }
-.site-hd-in { width: 100%; margin: 0 auto; display: flex; align-items: center; gap: 22px;
+  border-bottom: 1px solid var(--line);
+  margin: -20px calc(50% - 50vw) 22px; padding: 0 32px; }
+.site-hd-in { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 22px;
   height: 60px; }
 .site-hd .brand { display: flex; align-items: center; gap: 10px; text-decoration: none;
   color: var(--txt); }
@@ -218,8 +221,8 @@ body {
   box-shadow: 0 4px 12px rgba(77, 107, 254, .25); transition: background .15s ease; }
 .site-hd .cta:hover { background: var(--blue-deep); }
 
-/* 首页 Hero(智谱式通栏:深蓝黑渐变 + 光斑 + 网格,出血到屏幕边缘) */
-.hero { margin: 0 -32px 40px; border-radius: 0; position: relative;
+/* 首页 Hero(智谱式通栏深色首屏:出血到视口边缘,文案居中限宽) */
+.hero { margin: 0 calc(50% - 50vw) 42px; border-radius: 0; position: relative;
   background:
     radial-gradient(44rem 22rem at 18% -10%, rgba(77, 107, 254, .34), transparent 62%),
     radial-gradient(36rem 20rem at 86% 8%, rgba(124, 92, 252, .22), transparent 60%),
@@ -288,8 +291,8 @@ body {
 .cap-card.tone-x:hover, .role-card.tone-x:hover { border-color: var(--tn-line);
   box-shadow: 0 10px 26px var(--tn-shadow); }
 
-/* 底部 CTA 带(通栏出血) */
-.cta-band { margin: 8px -32px 0; border-radius: 0; padding: 36px 48px;
+/* 底部 CTA 带(容器内圆角卡,与内容区同宽) */
+.cta-band { margin: 8px 0 0; border-radius: 16px; padding: 34px 40px;
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
   background:
     radial-gradient(30rem 14rem at 88% -30%, rgba(124, 92, 252, .28), transparent 60%),
