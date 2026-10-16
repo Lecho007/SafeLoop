@@ -82,6 +82,8 @@ hf download Qwen/Qwen3-1.7B --local-dir weights/red/Qwen3-1.7B
 hf download microsoft/Phi-3.5-mini-instruct --local-dir weights/target/Phi-3.5-mini-instruct
 hf download Qwen/Qwen3Guard-Gen-0.6B --local-dir weights/judge/Qwen3Guard-Gen-0.6B
 hf download qylu4156/strongreject-15k-v1 --local-dir weights/evaluator/strongreject-gemma-2b
+# AI 报告分析器（网页「AI 分析」对话用；不下载则该功能提示权重缺失，其余不受影响）
+hf download Qwen/Qwen3-4B --local-dir weights/analyzer/Qwen3-4B
 # 镜像：HF_ENDPOINT=https://hf-mirror.com hf download ...
 python scripts/check_weights.py    # 完成后校验
 ```
@@ -340,8 +342,9 @@ docker compose down                      # 停止（outputs 数据在 named volu
 
 ### 前端冒烟测试（Playwright，零 GPU）
 
-覆盖：首页渲染/架构图/历史 → 载入示例数据 → 报告页（徽章卡/导出按钮）→
-回放页（全量列表/全文弹窗）→ 指定场景类别加载。改前端后必跑。
+覆盖（32 项断言，改前端后必跑）：首页（通栏导航/Hero/能力卡/页脚）→
+产品页（架构图/角色卡）→ 工作台（向导/历史/指定场景）→ 报告页
+（示例卡/AI 分析/历史切换/返回）→ 回放页（筛选/全文弹窗）→ 文档页。
 
 ```bash
 # 前置①：Web 服务已启动（safeloop serve 或 uvicorn 方式）
