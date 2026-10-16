@@ -90,8 +90,9 @@ try {
 
   // ---- 文档页 ----
   await goto('docs')
-  ok('文档页速查表', (await page.locator('.dt-row').count()) >= 10)
-  ok('文档启动命令块', (await page.locator('.doc-code').count()) === 1)
+  ok('文档页区块指引表', (await page.locator('.dt-row').count()) >= 6)
+  ok('文档页无命令块(纯页面操作)', (await page.locator('.doc-code').count()) === 0)
+  ok('文档页三步上手', (await page.getByText('三步上手').count()) >= 1)
 } catch (e) {
   failed++
   results.push('FAIL  异常中断: ' + e.message)

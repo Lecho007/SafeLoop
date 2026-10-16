@@ -19,7 +19,7 @@ body {
   min-height: 100vh;
 }
 #app { position: relative; z-index: 1; }
-.wrap { max-width: 1160px; margin: 0 auto; padding: 20px 24px 60px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 28px 60px; }
 
 /* ---------- 白卡(主体容器语言) ---------- */
 .glass, .card {
@@ -193,7 +193,7 @@ body {
 .site-hd { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .86);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line); margin: 0 -24px 20px; padding: 0 24px; }
-.site-hd-in { max-width: 1160px; margin: 0 auto; display: flex; align-items: center; gap: 22px;
+.site-hd-in { max-width: 1320px; margin: 0 auto; display: flex; align-items: center; gap: 22px;
   height: 60px; }
 .site-hd .brand { display: flex; align-items: center; gap: 10px; text-decoration: none;
   color: var(--txt); }
@@ -262,7 +262,7 @@ body {
   border: 3.5px solid transparent; border-bottom-color: rgba(124, 143, 255, .7); }
 .hl-note { color: #8b98b8; }
 
-/* 能力卡片网格 */
+/* 能力卡片网格(智谱式淡彩:图标底与 hover 同色系) */
 .cap-head { text-align: center; margin-bottom: 22px; }
 .cap-head h2 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
 .cap-head p { color: var(--muted); font-size: 14.5px; margin: 0; }
@@ -271,12 +271,21 @@ body {
 .cap-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 22px 22px 20px; text-decoration: none; color: var(--txt); display: block;
   transition: all .18s ease; box-shadow: 0 2px 8px rgba(31, 35, 41, .04); }
-.cap-card:hover { transform: translateY(-3px); border-color: #c9d4ff;
-  box-shadow: 0 10px 26px rgba(77, 107, 254, .12); }
+.cap-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(31, 35, 41, .10); }
 .cc-ico { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
-  background: var(--blue-soft); margin-bottom: 14px; }
+  margin-bottom: 14px; background: var(--blue-soft); }
 .cc-t { font-size: 15.5px; font-weight: 650; margin-bottom: 8px; }
 .cc-d { font-size: 13px; color: var(--muted); line-height: 1.75; }
+/* 淡彩 tone(智谱卡片配色) */
+.tone-blue { --tn: #4d6bfe; --tn-bg: #eef2ff; --tn-line: #c7d2fe; --tn-shadow: rgba(77, 107, 254, .14); }
+.tone-purple { --tn: #7c5cfc; --tn-bg: #f3efff; --tn-line: #ddd3fa; --tn-shadow: rgba(124, 92, 252, .14); }
+.tone-teal { --tn: #0e9f6e; --tn-bg: #e8fbf4; --tn-line: #b9eedc; --tn-shadow: rgba(14, 159, 110, .14); }
+.tone-orange { --tn: #d97706; --tn-bg: #fff4e5; --tn-line: #fbd9a4; --tn-shadow: rgba(217, 119, 6, .14); }
+.tone-green { --tn: #12a150; --tn-bg: #ebfaf1; --tn-line: #bbe9cc; --tn-shadow: rgba(18, 161, 80, .14); }
+.tone-rose { --tn: #e5484d; --tn-bg: #fdeef0; --tn-line: #f9cdd3; --tn-shadow: rgba(229, 72, 77, .14); }
+.cap-card.tone-x .cc-ico, .role-card.tone-x .rc-ico { background: var(--tn-bg); }
+.cap-card.tone-x:hover, .role-card.tone-x:hover { border-color: var(--tn-line);
+  box-shadow: 0 10px 26px var(--tn-shadow); }
 
 /* 底部 CTA 带 */
 .cta-band { border-radius: 16px; margin-top: 8px; padding: 34px 36px;
@@ -302,7 +311,6 @@ body {
 .role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .role-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 20px; transition: all .18s ease; }
-.role-card:hover { border-color: #c9d4ff; box-shadow: 0 8px 20px rgba(77, 107, 254, .10); }
 .rc-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
   background: var(--blue-soft); margin-bottom: 12px; }
 .rc-t { font-size: 15px; font-weight: 650; }
@@ -356,9 +364,12 @@ body {
 
 /* ---------- Element Plus 融合微调 ---------- */
 .el-segmented { --el-border-radius-base: 999px; background: #f2f3f5; border: 1px solid var(--line); }
+/* 选中滑块改白色浮起块（EP 默认被主题色染成蓝块，蓝底蓝字导致选中项文字不可见） */
+.el-segmented__item-selected { background: #ffffff !important;
+  box-shadow: 0 1px 5px rgba(31, 35, 41, .12); border-radius: 999px !important; }
 .el-segmented__item { border-radius: 999px !important; font-weight: 600; padding: 0 16px;
   color: var(--muted); }
-.el-segmented__item.is-selected { color: var(--blue); }
+.el-segmented__item.is-selected { color: var(--blue); font-weight: 650; }
 .el-select__wrapper, .el-input__wrapper {
   background: #fff;
   box-shadow: 0 0 0 1px var(--line) inset;

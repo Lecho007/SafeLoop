@@ -23,7 +23,7 @@
         <p>四个角色分工明确，判别与评审分离是可信性的来源</p>
       </div>
       <div class="role-grid">
-        <div class="role-card" v-for="r in roles" :key="r.t">
+        <div class="role-card tone-x" :class="r.tone" v-for="r in roles" :key="r.t">
           <span class="rc-ico" v-html="r.icon"></span>
           <div class="rc-t">{{ r.t }}</div>
           <div class="rc-m">{{ r.model }}</div>
@@ -98,13 +98,13 @@ import hero from '../assets/hero.html?raw'
 import { icon } from '../icons.js'
 
 const roles = [
-  { t: '红方测试员', model: 'Qwen3-1.7B', d: '设计并逐轮调整测试问题，输出结构化攻击动作；只收到判别器的策略维度提示，不收到攻击文本。',
+  { t: '红方测试员', model: 'Qwen3-1.7B', tone: 'tone-rose', d: '设计并逐轮调整测试问题，输出结构化攻击动作；只收到判别器的策略维度提示，不收到攻击文本。',
     icon: icon('play', 18, 'stroke:#e5484d') },
-  { t: '被测大模型', model: '本地模型 / 在线 API', d: '被评估对象。本地支持 NF4 量化单卡部署，在线支持 OpenAI 兼容、Anthropic、Responses 三种协议。',
+  { t: '被测大模型', model: '本地模型 / 在线 API', tone: 'tone-purple', d: '被评估对象。本地支持 NF4 量化单卡部署，在线支持 OpenAI 兼容、Anthropic、Responses 三种协议。',
     icon: icon('target', 18, 'stroke:#7c5cfc') },
-  { t: '安全判别', model: 'Qwen3Guard-0.6B', d: '内容安全与目标推进双视角逐轮观察，多维输出带字段级来源标注，缺数据为空不伪造。',
+  { t: '安全判别', model: 'Qwen3Guard-0.6B', tone: 'tone-orange', d: '内容安全与目标推进双视角逐轮观察，多维输出带字段级来源标注，缺数据为空不伪造。',
     icon: icon('pulse', 18, 'stroke:#d97706') },
-  { t: '独立评审官', model: 'StrongREJECT-2B', d: '闭环之外，只在测试结束后依据原始目标与模型回答做最终裁决——风险结论的唯一口径。',
+  { t: '独立评审官', model: 'StrongREJECT-2B', tone: 'tone-green', d: '闭环之外，只在测试结束后依据原始目标与模型回答做最终裁决——风险结论的唯一口径。',
     icon: icon('shield', 18, 'stroke:#12a150') },
 ]
 
